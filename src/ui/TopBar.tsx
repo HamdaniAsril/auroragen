@@ -1,24 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useT } from '../i18n/useT'
-import { studio, useStudio } from '../state/store'
 import { PRESETS } from '../presets/presets'
-import { writeSceneToHash } from '../state/urlSync'
-import { ExportDialog } from './ExportDialog'
-import { SaveDialog } from './SaveDialog'
-import { ShareDialog } from './ShareDialog'
-import { toast } from './Toast'
+import { studio, useStudio } from '../state/store'
+import { openExport, openSave, share } from './dialogs'
 import { DiceIcon, RedoIcon, UndoIcon } from './icons'
 
-export function TopBar() {
+export function TopBar({ compact = false }: { compact?: boolean }) {
   const t = useT()
   const canUndo = useStudio((s) => s.history.past.length > 0)
   const canRedo = useStudio((s) => s.history.future.length > 0)
   const dirty = useStudio((s) => s.dirty)
   const lang = useStudio((s) => s.lang)
   const zoom = useStudio((s) => s.zoom)
-  const [exporting, setExporting] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [shareUrl, setShareUrl] = useState<string | null>(null)
   const presetName = useStudio((s) => PRESETS.find((p) => p.id === s.presetId)?.name[s.lang])
 
   useEffect(() => {
@@ -35,11 +28,13 @@ export function TopBar() {
   }, [])
 
   const st = studio.getState()
+  const toggleLang = () => st.setLang(lang === 'id' ? 'en' : 'id')
+
   return (
     <header className="topbar">
       <div className="brand">
         <span className="brand-name">{t('app.name')}</span>
-        {presetName && <span className="preset-name">{presetName}</span>}
+        {!compact && presetName && <span className="preset-name">{presetName}</span>}
         {dirty && <span className="dirty" role="img" aria-label={t('top.unsaved')} title={t('top.unsaved')} />}
       </div>
       <div className="tool-group">
@@ -50,45 +45,42 @@ export function TopBar() {
           <RedoIcon />
         </button>
       </div>
-      <button type="button" className="btn" onClick={() => st.randomizeAll()}>
-        <DiceIcon /> {t('top.randomize')}
-      </button>
-      <div className="seg" role="group" aria-label="Zoom">
-        <button type="button" aria-pressed={zoom === 'fit'} onClick={() => st.setZoom('fit')}>
-          {t('top.zoomFit')}
+      {compact ? (
+        <button type="button" className="icon-btn" onClick={() => st.randomizeAll()} aria-label={t('top.randomize')} title={t('top.randomize')}>
+          <DiceIcon />
         </button>
-        <button type="button" aria-pressed={zoom === '100'} onClick={() => st.setZoom('100')}>
-          {t('top.zoom100')}
+      ) : (
+        <button type="button" className="btn" onClick={() => st.randomizeAll()}>
+          <DiceIcon /> {t('top.randomize')}
         </button>
-      </div>
+      )}
+      {!compact && (
+        <div className="seg" role="group" aria-label="Zoom">
+          <button type="button" aria-pressed={zoom === 'fit'} onClick={() => st.setZoom('fit')}>
+            {t('top.zoomFit')}
+          </button>
+          <button type="button" aria-pressed={zoom === '100'} onClick={() => st.setZoom('100')}>
+            {t('top.zoom100')}
+          </button>
+        </div>
+      )}
       <div className="spacer" />
-      <button type="button" className="btn ghost" onClick={() => st.setLang(lang === 'id' ? 'en' : 'id')}>
-        {t('top.lang')}
+      <button type="button" className="btn ghost" onClick={toggleLang} aria-label={t('top.lang')}>
+        {compact ? (lang === 'id' ? 'EN' : 'ID') : t('top.lang')}
       </button>
-      <button
-        type="button"
-        className="btn"
-        onClick={async () => {
-          writeSceneToHash(studio.getState().scene, { immediate: true })
-          try {
-            await navigator.clipboard.writeText(location.href)
-            toast(t('share.copied'))
-          } catch {
-            setShareUrl(location.href)
-          }
-        }}
-      >
-        {t('top.share')}
-      </button>
-      <button type="button" className="btn" onClick={() => setSaving(true)}>
-        {t('top.save')}
-      </button>
-      <button type="button" className="btn primary" onClick={() => setExporting(true)}>
-        {t('top.export')}
-      </button>
-      <ExportDialog open={exporting} onClose={() => setExporting(false)} />
-      {shareUrl && <ShareDialog url={shareUrl} onClose={() => setShareUrl(null)} />}
-      {saving && <SaveDialog open onClose={() => setSaving(false)} defaultName={presetName ?? t('app.name')} />}
+      {!compact && (
+        <>
+          <button type="button" className="btn" onClick={() => void share()}>
+            {t('top.share')}
+          </button>
+          <button type="button" className="btn" onClick={openSave}>
+            {t('top.save')}
+          </button>
+          <button type="button" className="btn primary" onClick={openExport}>
+            {t('top.export')}
+          </button>
+        </>
+      )}
     </header>
   )
 }

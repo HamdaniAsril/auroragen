@@ -3,8 +3,10 @@ import { detectLang, t } from './i18n/strings'
 import { PRESETS } from './presets/presets'
 import { studio, useStudio } from './state/store'
 import { exportSizeForFrame, readSceneFromHash, writeSceneToHash } from './state/urlSync'
+import { Dialogs } from './ui/dialogs'
 import { Inspector } from './ui/Inspector'
 import { LibraryPanel } from './ui/LibraryPanel'
+import { MobileSheet } from './ui/MobileSheet'
 import { PlayBar } from './ui/PlayBar'
 import { Preview } from './ui/Preview'
 import { toast, Toaster } from './ui/Toast'
@@ -21,9 +23,24 @@ const hasWebGL2 = () => {
 
 if (import.meta.env.DEV) Object.assign(window, { __studio: studio })
 
+const PHONE = '(max-width: 767px)'
+
+function useIsPhone(): boolean {
+  const [phone, setPhone] = useState(() => window.matchMedia?.(PHONE).matches ?? false)
+  useEffect(() => {
+    const mq = window.matchMedia?.(PHONE)
+    if (!mq) return
+    const on = () => setPhone(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return phone
+}
+
 export default function App() {
   const [supported] = useState(hasWebGL2)
   const lang = useStudio((s) => s.lang)
+  const phone = useIsPhone()
 
   useEffect(() => {
     const st = studio.getState()
@@ -51,6 +68,20 @@ export default function App() {
 
   if (!supported) return <Unsupported />
 
+  if (phone)
+    return (
+      <div className="studio phone">
+        <TopBar compact />
+        <main className="stage">
+          <Preview />
+          <PlayBar />
+        </main>
+        <MobileSheet />
+        <Dialogs />
+        <Toaster />
+      </div>
+    )
+
   return (
     <div className="studio">
       <TopBar />
@@ -64,6 +95,7 @@ export default function App() {
       <aside className="panel right">
         <Inspector />
       </aside>
+      <Dialogs />
       <Toaster />
     </div>
   )
