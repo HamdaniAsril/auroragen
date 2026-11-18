@@ -17,9 +17,16 @@ export interface ExportOptions {
 
 const abortError = () => new DOMException('Export cancelled', 'AbortError')
 
+export class ContextLostError extends Error {
+  constructor() {
+    super('The GPU context was lost during export')
+    this.name = 'ContextLostError'
+  }
+}
+
 /** Renders the full image tile by tile on its own GPU context and assembles it on a 2D canvas. */
-export async function renderToCanvas(o: Omit<ExportOptions, 'format' | 'quality'>): Promise<HTMLCanvasElement> {
-  const glCanvas = document.createElement('canvas')
+export async function renderToCanvas(o: Omit<ExportOptions, 'format' | 'quality'> & { canvas?: HTMLCanvasElement }): Promise<HTMLCanvasElement> {
+  const glCanvas = o.canvas ?? document.createElement('canvas')
   const renderer = new Renderer(glCanvas)
   try {
     const out = document.createElement('canvas')
@@ -34,6 +41,8 @@ export async function renderToCanvas(o: Omit<ExportOptions, 'format' | 'quality'
       if (o.signal?.aborted) throw abortError()
       const tile = tiles[i]
       renderer.render(o.scene, o.time, { width: o.width, height: o.height, tile, reuseBloom: true }, 'export')
+      // A lost context renders nothing; never assemble blank tiles into a file.
+      if (renderer.isLost()) throw new ContextLostError()
       const px = renderer.readPixels()
       const img = ctx.createImageData(tile.w, tile.h)
       img.data.set(px)

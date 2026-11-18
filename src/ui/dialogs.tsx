@@ -5,6 +5,7 @@ import { PRESETS } from '../presets/presets'
 import { studio, useStudio } from '../state/store'
 import { writeSceneToHash } from '../state/urlSync'
 import { ExportDialog } from './ExportDialog'
+import { getPreviewLoop } from './previewBus'
 import { SaveDialog } from './SaveDialog'
 import { ShareDialog } from './ShareDialog'
 import { toast } from './Toast'
@@ -18,7 +19,14 @@ export const openExport = () => dialogs.setState({ open: { kind: 'export' } })
 export const openSave = () => dialogs.setState({ open: { kind: 'save' } })
 
 /** Puts the scene in the URL and copies it; shows the link to copy by hand if the clipboard is blocked. */
+/** Writes the preview's live time into the scene, so what is shared or saved is the frame on screen. */
+export function captureLiveTime(): void {
+  const live = getPreviewLoop()?.liveTime
+  if (live !== undefined) studio.getState().setTime(live)
+}
+
 export async function share(): Promise<void> {
+  captureLiveTime()
   const st = studio.getState()
   writeSceneToHash(st.scene, { immediate: true })
   try {

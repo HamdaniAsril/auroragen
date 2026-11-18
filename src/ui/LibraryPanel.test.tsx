@@ -7,6 +7,22 @@ import { LibraryPanel } from './LibraryPanel'
 
 vi.mock('../presets/thumbnails', () => ({ getThumbnail: () => new Promise(() => {}) }))
 
+// Node's own experimental localStorage shadows jsdom's, so saved scenes use an in-memory store here.
+const memory = vi.hoisted(() => {
+  const m = new Map<string, string>()
+  return {
+    get length() {
+      return m.size
+    },
+    clear: () => m.clear(),
+    getItem: (k: string) => m.get(k) ?? null,
+    key: (i: number) => [...m.keys()][i] ?? null,
+    removeItem: (k: string) => void m.delete(k),
+    setItem: (k: string, v: string) => void m.set(k, v),
+  } as Storage
+})
+vi.mock('../state/saved', async (orig) => ({ ...(await orig<typeof import('../state/saved')>()), getStorage: () => memory }))
+
 beforeEach(() => studio.setState({ scene: { ...defaultScene(), frame: { aspectW: 9, aspectH: 16 } }, lang: 'id', presetId: null }))
 
 test('clicking a preset applies it and keeps the frame', () => {
@@ -23,4 +39,16 @@ test('search narrows the list', () => {
   fireEvent.change(getByRole('searchbox'), { target: { value: PRESETS[5].name.id } })
   expect(queryByRole('button', { name: PRESETS[5].name.id })).not.toBeNull()
   expect(queryByRole('button', { name: PRESETS[0].name.id })).toBeNull()
+})
+
+test('a saved scene opens with its own frame', async () => {
+  const { addSaved } = await import('../state/saved')
+  memory.clear()
+  addSaved(memory, 'Wallpaper', { ...defaultScene(), frame: { aspectW: 215, aspectH: 466 } })
+  studio.setState({ scene: defaultScene() })
+  const { getByRole } = render(<LibraryPanel />)
+  fireEvent.click(getByRole('tab', { name: 'Tersimpan' }))
+  fireEvent.click(getByRole('button', { name: 'Wallpaper' }))
+  expect(studio.getState().scene.frame).toEqual({ aspectW: 215, aspectH: 466 })
+  expect(studio.getState().exportSize).toEqual({ w: 1290, h: 2796 })
 })

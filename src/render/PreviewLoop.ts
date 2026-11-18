@@ -1,3 +1,4 @@
+import { RANGES } from '../scene/ranges'
 import type { Scene } from '../scene/types'
 import { AdaptiveScaler } from './adaptive'
 import type { Renderer } from './Renderer'
@@ -9,6 +10,8 @@ interface LoopOptions {
 }
 
 const REFINE_AFTER_MS = 250
+/** The play bar's timeline; playback loops around it so pausing never lands outside it. */
+const TIMELINE = RANGES.time.max
 
 /**
  * Drives the live preview. While playing, time advances here (not in the store) and frames render at an
@@ -69,7 +72,7 @@ export class PreviewLoop {
   }
 
   seek(t: number): void {
-    this.time = t
+    this.time = Math.min(Math.max(t, 0), TIMELINE - 0.01)
     this.invalidate()
   }
 
@@ -106,7 +109,7 @@ export class PreviewLoop {
     this.lastFrame = now
     if (this.viewW > 1 && this.viewH > 1) {
       if (this.playing) {
-        this.time += (Math.min(dt, 100) / 1000) * this.speed
+        this.time = (this.time + (Math.min(dt, 100) / 1000) * this.speed) % TIMELINE
         if (dt > 0) this.scale = this.scaler.sample(dt)
         this.draw(this.scale, 'preview')
       } else if (this.dirty) {

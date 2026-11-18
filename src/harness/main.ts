@@ -40,6 +40,27 @@ const harness = {
       return (e as Error).name
     }
   },
+  async exportLoseMidway(json: string, t: number, w: number, h: number): Promise<string> {
+    const own = document.createElement('canvas')
+    let lost = false
+    try {
+      await renderToCanvas({
+        scene: parse(json),
+        time: t,
+        width: w,
+        height: h,
+        canvas: own,
+        onProgress: () => {
+          if (lost) return
+          lost = true
+          own.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext()
+        },
+      })
+      return 'finished'
+    } catch (e) {
+      return (e as Error).name
+    }
+  },
   loseContext(): void {
     loseExt.loseContext()
   },

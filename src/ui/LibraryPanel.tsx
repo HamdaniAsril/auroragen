@@ -73,7 +73,10 @@ function SavedList() {
     <div className="cards">
       {list.map((e) => (
         <div key={e.id} className="card saved">
-          <button type="button" className="card-open" aria-label={e.name} onClick={() => studio.getState().loadScene(sceneOf(e), { keepFrame: true })}>
+          <button type="button" className="card-open" aria-label={e.name} onClick={() => {
+              studio.getState().loadScene(sceneOf(e))
+              studio.setState({ presetId: null })
+            }}>
             <Thumb scene={{ ...sceneOf(e), frame: { aspectW: 16, aspectH: 9 } }} />
             <span className="card-name" aria-hidden="true">
               {e.name}

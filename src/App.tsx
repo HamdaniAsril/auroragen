@@ -4,6 +4,7 @@ import { PRESETS } from './presets/presets'
 import { studio, useStudio } from './state/store'
 import { exportSizeForFrame, readSceneFromHash, writeSceneToHash } from './state/urlSync'
 import { Dialogs } from './ui/dialogs'
+import { StudioErrorBoundary } from './ui/ErrorBoundary'
 import { Inspector } from './ui/Inspector'
 import { LibraryPanel } from './ui/LibraryPanel'
 import { MobileSheet } from './ui/MobileSheet'
@@ -50,7 +51,8 @@ export default function App() {
     if (fromLink && 'scene' in fromLink) {
       st.loadScene(fromLink.scene)
       st.setExport({ exportSize: exportSizeForFrame(fromLink.scene.frame) })
-      studio.setState({ history: { past: [], future: [] }, dirty: false, presetId: null })
+      // Open paused on the shared moment; the visitor can press play.
+      studio.setState({ history: { past: [], future: [] }, dirty: false, presetId: null, playing: false })
     } else {
       if (fromLink) toast(t(lang, 'link.invalid'))
       // The opening scene is the first preset.
@@ -70,6 +72,7 @@ export default function App() {
 
   if (phone)
     return (
+      <StudioErrorBoundary>
       <div className="studio phone">
         <TopBar compact />
         <main className="stage">
@@ -80,9 +83,11 @@ export default function App() {
         <Dialogs />
         <Toaster />
       </div>
+      </StudioErrorBoundary>
     )
 
   return (
+    <StudioErrorBoundary>
     <div className="studio">
       <TopBar />
       <aside className="panel left">
@@ -98,5 +103,6 @@ export default function App() {
       <Dialogs />
       <Toaster />
     </div>
+    </StudioErrorBoundary>
   )
 }

@@ -21,3 +21,9 @@ test('unknown aspect gets long side 3840', () => {
   expect(exportSizeForFrame({ aspectW: 5, aspectH: 4 })).toEqual({ w: 3840, h: 3072 })
   expect(exportSizeForFrame({ aspectW: 4, aspectH: 5 })).toEqual({ w: 3072, h: 3840 })
 })
+
+test('percent-encoded links still open', () => {
+  const s = { ...defaultScene(), camera: { pitch: 22, yaw: 5, lens: 30 } }
+  const encoded = encodeURIComponent(encodeScene(s))
+  expect(readSceneFromHash(`#s=${encoded}`)).toEqual({ scene: s })
+})

@@ -8,6 +8,7 @@ import { randomizeScene, randomSeed } from '../scene/random'
 import { clampTo } from '../scene/ranges'
 import { MAX_LAYERS, type AuroraLayer, type Scene } from '../scene/types'
 import { record, type History } from './history'
+import { sizeInStepWith } from './urlSync'
 
 export type ExportFormat = 'png' | 'jpg' | 'webp'
 
@@ -117,7 +118,7 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
 
       loadScene(s, o = {}) {
         const frame = o.keepFrame ? get().scene.frame : s.frame
-        commit({ ...s, frame }, undefined, { dirty: false, activeLayer: 0 })
+        commit({ ...s, frame }, undefined, { dirty: false, activeLayer: 0, exportSize: sizeInStepWith(frame, get().exportSize) })
       },
 
       undo() {
@@ -126,6 +127,7 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
         if (!prev) return
         set({
           scene: { ...prev, time: scene.time },
+          exportSize: sizeInStepWith(prev.frame, get().exportSize),
           history: { past: history.past.slice(0, -1), future: [scene, ...history.future] },
           activeLayer: Math.min(get().activeLayer, prev.layers.length - 1),
           dirty: true,
@@ -138,6 +140,7 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
         if (!next) return
         set({
           scene: { ...next, time: scene.time },
+          exportSize: sizeInStepWith(next.frame, get().exportSize),
           history: { past: [...history.past, scene], future: history.future.slice(1) },
           activeLayer: Math.min(get().activeLayer, next.layers.length - 1),
           dirty: true,

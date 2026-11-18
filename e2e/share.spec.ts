@@ -33,3 +33,23 @@ test('broken link opens the default scene with a notice', async ({ page }) => {
   await expect(page.getByRole('status')).toHaveText("That link didn't work, opening the default scene")
   await expect(page.getByRole('img', { name: /aurora/i })).toBeVisible()
 })
+
+test('share while playing records the moment on screen, and links open paused', async ({ page, browser }) => {
+  await page.goto('/')
+  await page.waitForTimeout(2500)
+  await page.getByRole('button', { name: 'Share' }).click()
+  await expect(page).toHaveURL(/#s=/)
+  type W = Window & { __studio: { getState(): { scene: { time: number }; playing: boolean } } }
+  const sharedTime = await page.evaluate(() => (window as unknown as W).__studio.getState().scene.time)
+  expect(sharedTime).toBeGreaterThan(30.5)
+  const ctx = await browser.newContext()
+  const p2 = await ctx.newPage()
+  await p2.goto(page.url())
+  await p2.waitForFunction(() => '__studio' in window)
+  const opened = await p2.evaluate(() => {
+    const s = (window as unknown as W).__studio.getState()
+    return { time: s.scene.time, playing: s.playing }
+  })
+  expect(opened).toEqual({ time: sharedTime, playing: false })
+  await ctx.close()
+})

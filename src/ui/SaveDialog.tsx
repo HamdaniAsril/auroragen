@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useT } from '../i18n/useT'
 import { addSaved, getStorage } from '../state/saved'
 import { studio } from '../state/store'
+import { getPreviewLoop } from './previewBus'
 import { toast } from './Toast'
 
 export function SaveDialog({ open, onClose, defaultName }: { open: boolean; onClose(): void; defaultName: string }) {
@@ -9,6 +10,8 @@ export function SaveDialog({ open, onClose, defaultName }: { open: boolean; onCl
   const [name, setName] = useState(defaultName)
   if (!open) return null
   const save = () => {
+    const live = getPreviewLoop()?.liveTime
+    if (live !== undefined) studio.getState().setTime(live)
     const result = addSaved(getStorage(), name, studio.getState().scene)
     toast(result === 'unavailable' ? t('storage.unavailable') : t('save.done'))
     onClose()

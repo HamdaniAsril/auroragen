@@ -219,6 +219,10 @@ export class Renderer {
     return out
   }
 
+  isLost(): boolean {
+    return this.lost || this.gl.isContextLost()
+  }
+
   onRestored(cb: () => void): () => void {
     this.restoredListeners.add(cb)
     return () => this.restoredListeners.delete(cb)

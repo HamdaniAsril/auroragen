@@ -76,3 +76,24 @@ test('setTime is not an undo step', () => {
   expect(st.getState().scene.time).toBe(5)
   expect(st.getState().scene.camera.yaw).toBe(0)
 })
+
+test('undo of a size change keeps the export size in step with the frame', () => {
+  const st = createStudioStore()
+  st.getState().setExport({ exportSize: { w: 1290, h: 2796 } })
+  st.getState().update((s) => {
+    s.frame = { aspectW: 215, aspectH: 466 }
+  }, 'frame')
+  st.getState().undo()
+  const { frame } = st.getState().scene
+  const size = st.getState().exportSize
+  expect(frame).toEqual({ aspectW: 16, aspectH: 9 })
+  expect(size.w * frame.aspectH).toBe(size.h * frame.aspectW)
+  st.getState().redo()
+  expect(st.getState().exportSize).toEqual({ w: 1290, h: 2796 })
+})
+
+test('loading a scene with another frame brings the export size along', () => {
+  const st = createStudioStore()
+  st.getState().loadScene({ ...defaultScene(), frame: { aspectW: 9, aspectH: 20 } })
+  expect(st.getState().exportSize).toEqual({ w: 1440, h: 3200 })
+})

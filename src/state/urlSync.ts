@@ -6,7 +6,13 @@ import type { Frame, Scene } from '../scene/types'
 export function readSceneFromHash(hash: string): { scene: Scene } | { error: 'invalid' } | null {
   const m = /[#&]s=([^&]*)/.exec(hash)
   if (!m) return null
-  const scene = decodeScene(m[1])
+  let payload = m[1]
+  try {
+    payload = decodeURIComponent(payload) // some apps escape '$' and '+' when passing links on
+  } catch {
+    // not escaped; use as is
+  }
+  const scene = decodeScene(payload)
   return scene ? { scene } : { error: 'invalid' }
 }
 
@@ -20,13 +26,27 @@ export function writeSceneToHash(scene: Scene, o: { immediate?: boolean } = {}):
   else timer = setTimeout(write, 400)
 }
 
-/** The export size to use for a frame from a link: a matching preset, else long side 3840. */
-export function exportSizeForFrame(frame: Frame): { w: number; h: number } {
-  const match = SIZE_PRESETS.find((p) => {
+/**
+ * The export size for a frame: a matching preset (the one nearest `prefer`'s long side, else the first),
+ * otherwise the frame scaled to `prefer`'s long side, or 3840.
+ */
+export function exportSizeForFrame(frame: Frame, prefer?: { w: number; h: number }): { w: number; h: number } {
+  const matches = SIZE_PRESETS.filter((p) => {
     const a = reduceAspect(p.w, p.h)
     return a.aspectW === frame.aspectW && a.aspectH === frame.aspectH
   })
-  if (match) return { w: match.w, h: match.h }
+  const want = prefer ? Math.max(prefer.w, prefer.h) : undefined
+  if (matches.length) {
+    const best = want === undefined ? matches[0] : matches.reduce((a, b) => (Math.abs(Math.max(b.w, b.h) - want) < Math.abs(Math.max(a.w, a.h) - want) ? b : a))
+    return { w: best.w, h: best.h }
+  }
+  const side = Math.min(want ?? 3840, 7680)
   const a = frame.aspectW / frame.aspectH
-  return a >= 1 ? { w: 3840, h: Math.round(3840 / a) } : { w: Math.round(3840 * a), h: 3840 }
+  return a >= 1 ? { w: side, h: Math.round(side / a) } : { w: Math.round(side * a), h: side }
+}
+
+/** Keeps `size` when it already has the frame's aspect, else picks a size that does. */
+export function sizeInStepWith(frame: Frame, size: { w: number; h: number }): { w: number; h: number } {
+  const a = reduceAspect(size.w, size.h)
+  return a.aspectW === frame.aspectW && a.aspectH === frame.aspectH ? size : exportSizeForFrame(frame, size)
 }

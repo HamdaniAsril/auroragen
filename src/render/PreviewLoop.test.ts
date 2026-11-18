@@ -69,3 +69,14 @@ test('100% view renders a centred tile of the full frame', () => {
   for (const cb of run) cb(0)
   expect(calls[0]).toEqual({ width: 3840, height: 2160, tile: { x: 1520, y: 855, w: 800, h: 450 } })
 })
+
+test('live time wraps inside the 0–600 s timeline', () => {
+  const { loop, step } = setup()
+  loop.setView(800, 450)
+  loop.seek(599.5)
+  loop.setPlaying(true)
+  loop.start()
+  for (let i = 0; i < 20; i++) step(50)
+  expect(loop.liveTime).toBeGreaterThanOrEqual(0)
+  expect(loop.liveTime).toBeLessThan(600)
+})

@@ -50,3 +50,7 @@ test('webp falls back to the wasm encoder when the browser cannot make webp', as
   expect(new TextDecoder().decode(b.slice(0, 4))).toBe('RIFF')
   expect(new TextDecoder().decode(b.slice(8, 12))).toBe('WEBP')
 })
+
+test('a lost GPU context during export fails instead of saving blank tiles', async ({ page }) => {
+  expect(await call<string>(page, 'exportLoseMidway', JSON.stringify(defaultScene()), 30, 1300, 700)).toBe('ContextLostError')
+})
