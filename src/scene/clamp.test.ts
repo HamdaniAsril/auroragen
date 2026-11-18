@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { clampScene } from './clamp'
 import { defaultScene } from './defaults'
+import { PALETTES } from './palettes'
 
 test('default scene is already valid', () => expect(clampScene(defaultScene())).toEqual(defaultScene()))
 
@@ -24,7 +25,7 @@ test('rejects bad enums, hex and frame', () => {
     frame: { aspectW: -1, aspectH: 0 },
   })
   expect(s.layers[0].type).toBe('tirai')
-  expect(s.layers[0].colors.bottom).toBe('#38FF73')
+  expect(s.layers[0].colors.bottom).toBe(PALETTES['classic-green'].bottom)
   expect(s.land.type).toBe('mountains')
   expect(s.frame).toEqual({ aspectW: 16, aspectH: 9 })
 })

@@ -6,12 +6,13 @@ export interface PaletteColors {
   top: Hex
 }
 
+// sRGB hex; the renderer converts to linear light. Values match the approved prototype's colours.
 export const PALETTES: Record<Exclude<PaletteId, 'custom'>, PaletteColors> = {
-  'classic-green': { bottom: '#38FF73', body: '#1ACC9E', top: '#CC2980' },
-  'green-violet': { bottom: '#3DFF8A', body: '#2EC4B6', top: '#8A4DFF' },
-  'rare-red': { bottom: '#7CFF6B', body: '#FF5A4D', top: '#B3122E' },
-  'pink-violet': { bottom: '#FF6FB5', body: '#C86BFF', top: '#5B3DFF' },
-  'ice-blue': { bottom: '#7FF5FF', body: '#3DA9FF', top: '#5B4DFF' },
+  'classic-green': { bottom: '#81FFB3', body: '#5AE7CE', top: '#E770BC' },
+  'green-violet': { bottom: '#86FFC2', body: '#76E3DC', top: '#C295FF' },
+  'rare-red': { bottom: '#B9FFAD', body: '#FFA095', top: '#DA4B76' },
+  'pink-violet': { bottom: '#FFB0DB', body: '#E5ADFF', top: '#A186FF' },
+  'ice-blue': { bottom: '#BBFBFF', body: '#86D5FF', top: '#A195FF' },
 }
 
-export const FRINGE: Hex = '#FF4D9E'
+export const FRINGE: Hex = '#FF95CE'
