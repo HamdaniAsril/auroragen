@@ -1,0 +1,345 @@
+<h2>Percobaan v2: kamera digeser langsung, bentuk aurora dan daratan terpisah</h2>
+<p class="subtitle">Seret preview untuk memutar kamera: geser kiri/kanan untuk arah hadap, atas/bawah untuk sudut. Tombol 🎲 Aurora hanya mengacak bentuk aurora, 🎲 Daratan hanya mengacak gunung.</p>
+
+<style>
+  .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 12px; overflow: hidden; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  .stage canvas.drag { cursor: grabbing; }
+  .hint { position: absolute; top: 12px; right: 12px; font: 500 12px/1 system-ui, sans-serif; color: #fff; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.2); border-radius: 999px; padding: 8px 12px; pointer-events: none; transition: opacity .4s; }
+  .ctrls { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: center; }
+  .ctrls button, .ctrls span { white-space: nowrap;
+    font: 600 12px/1 system-ui, sans-serif; color: #fff;
+    background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.25);
+    border-radius: 999px; padding: 8px 12px;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  .ctrls button { cursor: pointer; }
+  .ctrls span { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .panel { margin-top: 16px; display: grid; gap: 14px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { font: 500 13px/1 system-ui, sans-serif; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sl { display: grid; grid-template-columns: 130px 1fr 64px; gap: 12px; align-items: center; font-size: 14px; }
+  .sl output { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+  .sl input { width: 100%; accent-color: var(--accent); }
+  @media (max-width: 520px) { .sl { grid-template-columns: 1fr 56px; } .sl input { grid-column: 1 / -1; grid-row: 2; } }
+  .err { color: #fff; padding: 24px; font: 14px system-ui; }
+</style>
+
+<div class="stage" id="stage">
+  <canvas id="gl"></canvas>
+  <div class="ctrls">
+    <button type="button" id="pp">❚❚ Jeda</button>
+    <button type="button" id="diceA">🎲 Aurora</button>
+    <button type="button" id="diceL">🎲 Daratan</button>
+  </div>
+  <div class="hint" id="hint">↔ Seret untuk memutar kamera</div>
+</div>
+
+<div class="panel">
+  <div class="seg" id="types">
+    <button type="button" data-t="0" aria-pressed="true">Tirai</button>
+    <button type="button" data-t="1" aria-pressed="false">Busur</button>
+    <button type="button" data-t="2" aria-pressed="false">Korona</button>
+    <button type="button" data-t="3" aria-pressed="false">Pilar</button>
+    <button type="button" data-t="4" aria-pressed="false">Pusaran</button>
+  </div>
+  <label class="sl">Sudut kamera <input type="range" id="pitch" min="-8" max="90" step="1" value="14"><output id="pitchV">14°</output></label>
+  <label class="sl">Lensa <input type="range" id="lens" min="12" max="50" step="1" value="16"><output id="lensV">16 mm</output></label>
+  <label class="sl">Arah hadap <input type="range" id="yaw" min="-180" max="180" step="1" value="0"><output id="yawV">0°</output></label>
+  <label class="sl">Bentuk aurora <input type="range" id="seed" min="1" max="9999" step="1" value="1207"><output id="seedV">1207</output></label>
+  <label class="sl">Bentuk daratan <input type="range" id="land" min="1" max="9999" step="1" value="7205"><output id="landV">7205</output></label>
+</div>
+
+<script>
+(function () {
+  const cv = document.getElementById('gl');
+  const gl = cv.getContext('webgl', { antialias: false, premultipliedAlpha: false });
+  if (!gl) { document.getElementById('stage').innerHTML = '<p class="err">Browser ini tidak mendukung WebGL.</p>'; return; }
+
+  const VS = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }';
+  const FS = `
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime, uPitch, uYaw, uFov, uSeed, uLand;
+uniform int uType;
+
+float h21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
+  return mix(mix(h21(i), h21(i+vec2(1,0)), u.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), u.x), u.y); }
+float fbm3(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++){ v += a*vnoise(p); p = p*2.07 + vec2(17.1, 9.3); a *= 0.5; } return v / 0.875; }
+
+const vec3 GREEN = vec3(0.22, 1.0, 0.45);
+const vec3 TEAL  = vec3(0.10, 0.80, 0.62);
+const vec3 RED   = vec3(0.80, 0.16, 0.50);
+const vec3 PINK  = vec3(1.00, 0.30, 0.62);
+
+float S, L;
+
+// returns (signed horizontal distance to the curtain sheet, coordinate along it)
+vec2 curtain(vec2 q, float k){
+  float x = q.x;
+  if (uType == 1) { // busur: nearly straight band far away -> looks like an arc
+    float g = 1.7 + k*1.3 + 0.25*sin(x*0.12 + S*6.28 + k) + 0.3*(fbm3(vec2(x*0.08 + S*9.0, uTime*0.01)) - 0.5);
+    return vec2(q.y - g, x);
+  }
+  if (uType == 2) { // korona: folded curtains passing right overhead
+    float g = -0.45 + k*0.85 + 0.45*sin(x*1.1 + S*6.28 + uTime*0.05 + k*2.0) + 0.7*(fbm3(vec2(x*0.5 + S*13.0 + k*5.0, uTime*0.03)) - 0.5);
+    return vec2(q.y - g, x);
+  }
+  if (uType == 4) { // pusaran: spiral in the ground plane
+    vec2 c = vec2(-1.5 + 3.0*S, 5.5);
+    vec2 v = q - c;
+    float r = length(v);
+    float th = atan(v.y, v.x) + uTime*0.03;
+    float a = 0.4, b = 0.42;
+    float n = floor((r - a)/(b*6.2832) - th/6.2832 + 0.5);
+    float tt = th + 6.2832*n;
+    float rs = a + b*tt;
+    float turns = tt/6.2832;
+    float on = step(-0.1, turns) * (1.0 - smoothstep(1.5, 2.1, turns));
+    return vec2((r - rs) + (1.0 - on)*50.0, 0.5*b*tt*tt + a*tt + 7.0);
+  }
+  // tirai & pilar: folding curtain
+  float g = 2.3 + k*1.9
+          + 0.8*sin(x*0.5 + S*6.28 + k*2.1 + uTime*0.04)
+          + 1.9*(fbm3(vec2(x*0.28 + S*13.0 + k*7.0, uTime*0.02 + k)) - 0.5);
+  return vec2(q.y - g, x);
+}
+
+float rayFreq(){ return (uType == 1) ? 2.0 : 10.0; }
+
+vec3 emission(float s, float alt, float k, bool fine){
+  float coarse = vnoise(vec2(s*0.28 + S*20.0 + k*3.0, uTime*0.07));
+  float r = pow(coarse, 2.2)*2.3 + 0.06;
+  float contrast = (uType == 1) ? 0.2 : 1.0;
+  if (fine) {
+    float f = fbm3(vec2(s*rayFreq() + S*50.0 + k*11.0, uTime*0.22));
+    r *= mix(1.0, pow(f, 2.0)*2.5, contrast*0.85);
+  }
+  float hn = vnoise(vec2(s*1.6 + S*70.0 + k*4.0, uTime*0.1));
+  if (uType == 3) r *= smoothstep(0.5, 0.78, vnoise(vec2(s*0.9 + S*30.0, uTime*0.12))) * 1.8;
+  float hMul = (uType == 1) ? 0.5 : ((uType == 3) ? 1.7 : (uType == 2 ? 1.3 : 1.0));
+  float H0 = 1.0 + 0.2*vnoise(vec2(s*0.15 + k*5.0, uTime*0.05));
+  float a = alt - H0;
+  float hgt = mix(0.1, 0.85, hn*hn) * mix(0.7, 1.2, clamp(r*0.5, 0.0, 1.0)) * hMul;
+  float prof = smoothstep(-0.025, 0.012, a) * exp(-max(a, 0.0)/hgt);
+  vec3 c = mix(GREEN, mix(TEAL, RED, smoothstep(0.5, 1.7, a)), smoothstep(0.1, 0.75, a));
+  c = mix(c, PINK, (1.0 - smoothstep(-0.02, 0.04, a)) * 0.5);
+  return c * r * prof;
+}
+
+vec3 aurora(vec3 rd, float jit){
+  if (rd.y <= 0.002) return vec3(0.0);
+  float hl = max(length(rd.xz), 1e-4);
+  float tanEl = rd.y / hl;
+  vec2 dir = rd.xz / hl;
+  vec3 acc = vec3(0.0);
+  int nC = (uType == 4) ? 1 : 2;
+  float glowAmt = (uType == 1) ? 0.9 : 0.5;
+  float maxJump = (uType == 4) ? 1.2 : 1e4;
+  float t0 = 0.97 / tanEl;
+  float t1 = min(4.0 / tanEl, 55.0);
+  if (t0 > 55.0) return acc;
+  float dt = (t1 - t0) / 64.0;
+  for (int k = 0; k < 2; k++) {
+    if (k >= nC) break;
+    float fk = float(k);
+    float t = t0 + dt*jit;
+    vec2 prev = curtain(dir*t, fk);
+    float tprev = t;
+    for (int i = 0; i < 64; i++) {
+      t += dt;
+      vec2 cur = curtain(dir*t, fk);
+      float fade = exp(-t*0.028);
+      // sharp sheet: find where the view ray passes through the curtain
+      if (prev.x * cur.x <= 0.0 && abs(prev.x) + abs(cur.x) < maxJump) {
+        float w = prev.x / (prev.x - cur.x + 1e-6);
+        float tc = mix(tprev, t, w);
+        float s = mix(prev.y, cur.y, w);
+        vec2 qc = dir*tc;
+        float e = 0.01;
+        vec2 gr = vec2(curtain(qc + vec2(e, 0.0), fk).x - curtain(qc - vec2(e, 0.0), fk).x,
+                       curtain(qc + vec2(0.0, e), fk).x - curtain(qc - vec2(0.0, e), fk).x);
+        vec2 n = normalize(gr + 1e-6);
+        float c = abs(dot(rd.xz, n));
+        float edge = 1.0 / sqrt(c*c + 0.02);
+        acc += emission(s, tc*tanEl, fk, true) * edge * fade * 0.22 * (k == 0 ? 1.0 : 0.65);
+      }
+      // soft glow around the sheet
+      float gw = exp(-cur.x*cur.x / 0.25);
+      if (gw > 0.02) acc += emission(cur.y, t*tanEl, fk, false) * gw * dt * fade * glowAmt * (k == 0 ? 1.0 : 0.65);
+      prev = cur; tprev = t;
+    }
+  }
+  return acc * smoothstep(0.0, 0.05, rd.y);
+}
+
+float ridge(float az){ float m = fbm3(vec2(az*(2.2 + 2.5*fract(L*3.7)) + L*97.0, 1.3 + L*13.0)); return 0.006 + (0.07 + 0.16*fract(L*7.13))*m*m*m + 0.012*vnoise(vec2(az*26.0 + L*41.0, 4.0)); }
+
+float stars(vec3 rd){
+  vec2 sp = rd.xz / (1.0 + max(rd.y, 0.0)) * 240.0;
+  vec2 id = floor(sp), f = fract(sp);
+  float h = h21(id);
+  if (h < 0.96) return 0.0;
+  vec2 pos = vec2(h21(id + 1.7), h21(id + 9.2)) * 0.6 + 0.2;
+  float d = length(f - pos);
+  float br = pow(h21(id + 4.4), 5.0)*1.4 + 0.12;
+  float tw = 0.75 + 0.25*sin(uTime*(1.0 + 3.0*h21(id + 2.0)) + h*40.0);
+  return br * tw * smoothstep(0.14, 0.0, d);
+}
+
+vec3 sky(vec3 rd, float jit, bool withStars){
+  float e = max(rd.y, 0.0);
+  vec3 c = mix(vec3(0.020, 0.045, 0.070), vec3(0.003, 0.007, 0.018), pow(e, 0.45));
+  vec3 au = aurora(rd, jit);
+  c += 0.06 * au.g * vec3(0.2, 0.6, 0.45); // green glow lighting up the sky
+  if (withStars) c += vec3(stars(rd)) * (1.0 - clamp(length(au)*0.6, 0.0, 0.8));
+  return c + au;
+}
+
+void main(){
+  S = fract(uSeed * 0.6180339);
+  L = fract(uLand * 0.7548777);
+  vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / (0.5*uRes.x);
+  float tx = tan(uFov*0.5);
+  vec3 fw = vec3(sin(uYaw)*cos(uPitch), sin(uPitch), cos(uYaw)*cos(uPitch));
+  vec3 rt = normalize(vec3(cos(uYaw), 0.0, -sin(uYaw)));
+  vec3 up = cross(fw, rt);
+  vec3 rd = normalize(fw + uv.x*tx*rt + uv.y*tx*up);
+  float jit = h21(gl_FragCoord.xy + fract(uTime*7.0)*vec2(91.0, 37.0));
+
+  float az = atan(rd.x, rd.z);
+  float el = asin(clamp(rd.y, -1.0, 1.0));
+  float rg = ridge(az);
+  vec3 col;
+  if (el >= 0.0) {
+    if (el < rg) {
+      col = vec3(0.004, 0.008, 0.011) + 0.01*vec3(0.1, 0.5, 0.35)*smoothstep(0.0, rg, el);
+    } else {
+      col = sky(rd, jit, true);
+    }
+  } else {
+    // lake: reflect the sky and mountains, with gentle ripples
+    vec2 g = rd.xz / max(-rd.y, 0.002);
+    float rip = (vnoise(g*vec2(0.8, 5.0) + vec2(0.0, uTime*0.25)) - 0.5) * 0.008;
+    vec3 rr = normalize(vec3(rd.x + rip*0.3, -rd.y + rip, rd.z));
+    float rel = asin(clamp(rr.y, -1.0, 1.0));
+    vec3 rc = (rel < ridge(atan(rr.x, rr.z))) ? vec3(0.003, 0.006, 0.009) : sky(rr, jit, true);
+    float fres = mix(0.92, 0.5, smoothstep(0.0, 0.4, -rd.y));
+    col = rc * fres + vec3(0.002, 0.004, 0.006);
+  }
+
+  col = 1.0 - exp(-col * 1.9);
+  col *= 1.0 - 0.28*dot(uv, uv);
+  col += (h21(gl_FragCoord.xy*1.7 + uTime) - 0.5) * 0.012;
+  col = pow(max(col, 0.0), vec3(0.92));
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+  function sh(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  let prog;
+  try {
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  } catch (e) {
+    console.error(e);
+    document.getElementById('stage').innerHTML = '<p class="err">Shader gagal: ' + String(e.message).slice(0, 300) + '</p>';
+    return;
+  }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = {};
+  ['uRes', 'uTime', 'uPitch', 'uYaw', 'uFov', 'uSeed', 'uLand', 'uType'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const st = { type: 0, pitch: 14, lens: 16, yaw: 0, seed: 1207, land: 7205, t: 30, paused: reduce, dirty: true };
+  const presets = { 0: [14, 16], 1: [16, 12], 2: [80, 14], 3: [10, 20], 4: [24, 14] };
+
+  const $ = function (id) { return document.getElementById(id); };
+  const pp = $('pp');
+  function syncUI() {
+    $('pitch').value = st.pitch; $('pitchV').textContent = st.pitch + '°';
+    $('lens').value = st.lens; $('lensV').textContent = st.lens + ' mm';
+    $('yaw').value = st.yaw; $('yawV').textContent = st.yaw + '°';
+    $('seed').value = st.seed; $('seedV').textContent = st.seed;
+    $('land').value = st.land; $('landV').textContent = st.land;
+    pp.textContent = st.paused ? '▶ Putar' : '❚❚ Jeda';
+    document.querySelectorAll('#types button').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.t === st.type)); });
+    st.dirty = true;
+  }
+  document.querySelectorAll('#types button').forEach(function (b) {
+    b.addEventListener('click', function () { st.type = +b.dataset.t; st.pitch = presets[st.type][0]; st.lens = presets[st.type][1]; syncUI(); });
+  });
+  ['pitch', 'lens', 'yaw', 'seed', 'land'].forEach(function (id) {
+    $(id).addEventListener('input', function (e) { st[id] = +e.target.value; syncUI(); });
+  });
+  pp.addEventListener('click', function () { st.paused = !st.paused; syncUI(); });
+  $('diceA').addEventListener('click', function () { st.seed = 1 + Math.floor(Math.random() * 9999); syncUI(); });
+  $('diceL').addEventListener('click', function () { st.land = 1 + Math.floor(Math.random() * 9999); syncUI(); });
+
+  // drag the preview to aim the camera, like grabbing the sky
+  let drag = null;
+  cv.addEventListener('pointerdown', function (e) {
+    drag = { x: e.clientX, y: e.clientY, yaw: st.yaw, pitch: st.pitch };
+    cv.setPointerCapture(e.pointerId); cv.classList.add('drag');
+    $('hint').style.opacity = '0';
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    const r = cv.getBoundingClientRect();
+    const hfov = 2 * Math.atan(18 / st.lens) * 180 / Math.PI;
+    const vfov = 2 * Math.atan(Math.tan(hfov * Math.PI / 360) * r.height / r.width) * 180 / Math.PI;
+    let yaw = drag.yaw - (e.clientX - drag.x) * hfov / r.width;
+    yaw = ((yaw + 180) % 360 + 360) % 360 - 180;
+    st.yaw = Math.round(yaw);
+    st.pitch = Math.round(Math.max(-8, Math.min(90, drag.pitch + (e.clientY - drag.y) * vfov / r.height)));
+    syncUI();
+  });
+  const endDrag = function () { drag = null; cv.classList.remove('drag'); };
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+  syncUI();
+
+  const SCALE = 0.75;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const w = Math.max(2, Math.round(r.width * SCALE)), h = Math.max(2, Math.round(r.height * SCALE));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; st.dirty = true; }
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    resize();
+    if (!st.paused) { st.t += dt; st.dirty = true; }
+    if (st.dirty) {
+      gl.viewport(0, 0, cv.width, cv.height);
+      gl.uniform2f(U.uRes, cv.width, cv.height);
+      gl.uniform1f(U.uTime, st.t);
+      gl.uniform1f(U.uPitch, st.pitch * Math.PI / 180);
+      gl.uniform1f(U.uYaw, st.yaw * Math.PI / 180);
+      gl.uniform1f(U.uFov, 2 * Math.atan(18 / st.lens));
+      gl.uniform1f(U.uSeed, st.seed);
+      gl.uniform1f(U.uLand, st.land);
+      gl.uniform1i(U.uType, st.type);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      st.dirty = false;
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
