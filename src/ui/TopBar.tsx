@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { useT } from '../i18n/useT'
 import { studio, useStudio } from '../state/store'
 import { PRESETS } from '../presets/presets'
+import { writeSceneToHash } from '../state/urlSync'
 import { ExportDialog } from './ExportDialog'
 import { SaveDialog } from './SaveDialog'
+import { ShareDialog } from './ShareDialog'
+import { toast } from './Toast'
 import { DiceIcon, RedoIcon, UndoIcon } from './icons'
 
 export function TopBar() {
@@ -15,6 +18,7 @@ export function TopBar() {
   const zoom = useStudio((s) => s.zoom)
   const [exporting, setExporting] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
   const presetName = useStudio((s) => PRESETS.find((p) => p.id === s.presetId)?.name[s.lang])
 
   useEffect(() => {
@@ -61,7 +65,19 @@ export function TopBar() {
       <button type="button" className="btn ghost" onClick={() => st.setLang(lang === 'id' ? 'en' : 'id')}>
         {t('top.lang')}
       </button>
-      <button type="button" className="btn" disabled>
+      <button
+        type="button"
+        className="btn"
+        onClick={async () => {
+          writeSceneToHash(studio.getState().scene, { immediate: true })
+          try {
+            await navigator.clipboard.writeText(location.href)
+            toast(t('share.copied'))
+          } catch {
+            setShareUrl(location.href)
+          }
+        }}
+      >
         {t('top.share')}
       </button>
       <button type="button" className="btn" onClick={() => setSaving(true)}>
@@ -71,6 +87,7 @@ export function TopBar() {
         {t('top.export')}
       </button>
       <ExportDialog open={exporting} onClose={() => setExporting(false)} />
+      {shareUrl && <ShareDialog url={shareUrl} onClose={() => setShareUrl(null)} />}
       {saving && <SaveDialog open onClose={() => setSaving(false)} defaultName={presetName ?? t('app.name')} />}
     </header>
   )

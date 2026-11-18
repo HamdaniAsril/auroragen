@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { detectLang } from './i18n/strings'
+import { detectLang, t } from './i18n/strings'
 import { PRESETS } from './presets/presets'
 import { studio, useStudio } from './state/store'
+import { exportSizeForFrame, readSceneFromHash, writeSceneToHash } from './state/urlSync'
 import { Inspector } from './ui/Inspector'
 import { LibraryPanel } from './ui/LibraryPanel'
 import { PlayBar } from './ui/PlayBar'
 import { Preview } from './ui/Preview'
-import { Toaster } from './ui/Toast'
+import { toast, Toaster } from './ui/Toast'
 import { TopBar } from './ui/TopBar'
 import { Unsupported } from './ui/Unsupported'
 
@@ -25,9 +26,23 @@ export default function App() {
   const lang = useStudio((s) => s.lang)
 
   useEffect(() => {
-    studio.getState().setLang(detectLang(navigator.languages ?? [navigator.language]))
-    // The opening scene is the first preset.
-    if (!studio.getState().dirty) studio.setState({ presetId: PRESETS[0].id })
+    const st = studio.getState()
+    const lang = detectLang(navigator.languages ?? [navigator.language])
+    st.setLang(lang)
+    const fromLink = readSceneFromHash(location.hash)
+    if (fromLink && 'scene' in fromLink) {
+      st.loadScene(fromLink.scene)
+      st.setExport({ exportSize: exportSizeForFrame(fromLink.scene.frame) })
+      studio.setState({ history: { past: [], future: [] }, dirty: false, presetId: null })
+    } else {
+      if (fromLink) toast(t(lang, 'link.invalid'))
+      // The opening scene is the first preset.
+      studio.setState({ presetId: PRESETS[0].id })
+    }
+    // Keep the URL in step with the scene, so a reload or a copied address restores it.
+    return studio.subscribe((s, prev) => {
+      if (s.scene !== prev.scene) writeSceneToHash(s.scene)
+    })
   }, [])
 
   useEffect(() => {
