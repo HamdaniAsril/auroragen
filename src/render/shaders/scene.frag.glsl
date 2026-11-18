@@ -88,7 +88,8 @@ vec2 curtain(vec2 q, float k) {
   float x = p.x;
   float fq = LfoldFreq;
   if (Ltype == BUSUR) {
-    float g = Ldist - 0.6 + k * 1.3
+    // part of the auroral oval: the band bends away at the sides, so it reads as an arc
+    float g = Ldist - 0.6 + k * 1.3 + 0.025 * (1.0 + 0.3 * k) * x * x
       + LfoldAmp * (0.25 * sin(x * 0.12 * fq + LS * 6.28 + k) + 0.3 * (fbm3(vec2(x * 0.08 * fq + LS * 9.0, Lt * 0.01)) - 0.5));
     return vec2(p.y - g, x);
   }
@@ -140,6 +141,12 @@ vec3 emission(float s, float alt, float k, bool fine) {
   return c * r * prof * Lbright;
 }
 
+const float EARTH_R = 63.71; // 6371 km
+
+// Height above the curved ground at ground distance t along a ray with slope tanEl.
+float altAt(float t, float tanEl) { return t * tanEl + t * t / (2.0 * EARTH_R); }
+float distForAlt(float alt, float tanEl) { return EARTH_R * (sqrt(tanEl * tanEl + 2.0 * alt / EARTH_R) - tanEl); }
+
 // March along the ray's ground track through the aurora altitude band.
 vec3 auroraLayer(vec3 rd, float jit) {
   float hl = max(length(rd.xz), 1e-4);
@@ -149,8 +156,8 @@ vec3 auroraLayer(vec3 rd, float jit) {
   int nC = (Ltype == PUSARAN) ? 1 : 2;
   float glowAmt = (Ltype == BUSUR) ? 0.9 : 0.5;
   float maxJump = (Ltype == PUSARAN) ? 1.2 : 1e4;
-  float t0 = (Lbase - 0.03) / tanEl;
-  float t1 = min((Lbase + 3.0) / tanEl, 55.0);
+  float t0 = distForAlt(Lbase - 0.03, tanEl);
+  float t1 = min(distForAlt(Lbase + 3.0, tanEl), 55.0);
   if (t0 > 55.0) return acc;
   float dt = (t1 - t0) / float(uSteps);
   for (int k = 0; k < 2; k++) {
@@ -175,10 +182,10 @@ vec3 auroraLayer(vec3 rd, float jit) {
         vec2 n = normalize(gr + 1e-6);
         float c = abs(dot(rd.xz, n));
         float edge = 1.0 / sqrt(c * c + 0.02);
-        acc += emission(s, tc * tanEl, fk, true) * edge * fade * 0.22 * wk;
+        acc += emission(s, altAt(tc, tanEl), fk, true) * edge * fade * 0.22 * wk;
       }
       float gw = exp(-cur.x * cur.x / 0.25);
-      if (gw > 0.02) acc += emission(cur.y, t * tanEl, fk, false) * gw * dt * fade * glowAmt * wk;
+      if (gw > 0.02) acc += emission(cur.y, altAt(t, tanEl), fk, false) * gw * dt * fade * glowAmt * wk;
       prev = cur;
       tprev = t;
     }
@@ -209,20 +216,52 @@ float stars(vec3 rd) {
   return br * tw * smoothstep(0.14, 0.0, d) * (uStars.y / 0.6);
 }
 
+vec3 moonDir() {
+  float az = uMoon.y, el = uMoon.z;
+  return vec3(sin(az) * cos(el), sin(el), cos(az) * cos(el));
+}
+
 vec3 sky(vec3 rd, float jit) {
   float e = max(rd.y, 0.0);
   vec3 c = mix(uSkyHorizon, uSkyZenith, pow(e, 0.45));
   vec3 au = aurora(rd, jit);
   c += 0.06 * au.g * vec3(0.2, 0.6, 0.45) * (uAuroraGlow / 0.5);
-  c += vec3(stars(rd)) * (1.0 - clamp(length(au) * 0.6, 0.0, 0.8));
+  float starDim = 1.0;
+  if (uMoon.x > 0.5) {
+    float b = uMoon.w;
+    float d = acos(clamp(dot(rd, moonDir()), -1.0, 1.0));
+    vec3 moonCol = vec3(1.0, 0.96, 0.88);
+    c += moonCol * smoothstep(0.014, 0.011, d) * 6.0 * b;          // disc
+    c += moonCol * exp(-d * 18.0) * 0.12 * b;                      // halo
+    c += vec3(0.010, 0.016, 0.028) * b * (0.5 + 0.5 * exp(-d * 2.0)); // moonlit sky
+    starDim = 1.0 - 0.55 * b;
+  }
+  c += vec3(stars(rd)) * (1.0 - clamp(length(au) * 0.6, 0.0, 0.8)) * starDim;
   return c + au;
 }
 
+// Elevation angle (radians) of the land silhouette in direction az.
 float ridge(float az) {
-  float L = uLand.y;
+  int type = int(uLand.x + 0.5);
+  float L = uLand.y, height = uLand.z * 2.0, rough = uLand.w * 2.0;
+  if (type == 0) return 0.0; // none: open horizon
+  if (type == 2) {           // hills: smooth and low
+    float m = fbm3(vec2(az * 1.4 + L * 97.0, 2.1 + L * 13.0));
+    return 0.004 + (0.025 + 0.04 * fract(L * 7.13)) * m * m * height + 0.002 * rough * vnoise(vec2(az * 9.0 + L * 41.0, 4.0));
+  }
+  if (type == 3) {           // pines: low ground with a jagged treeline
+    float m = fbm3(vec2(az * 1.8 + L * 97.0, 3.7 + L * 13.0));
+    float ground = 0.006 + 0.02 * m * height;
+    float k = az * 140.0;
+    float cell = floor(k);
+    float u = fract(k) - 0.5;
+    float hcell = h21(vec2(cell, L * 50.0));
+    float tree = (0.012 + 0.016 * hcell * rough) * height * max(0.0, 1.0 - abs(u) * (2.2 + 1.5 * hcell));
+    tree *= step(0.18, h21(vec2(cell * 1.3, L * 71.0))); // occasional gaps
+    return ground + tree;
+  }
   float m = fbm3(vec2(az * (2.2 + 2.5 * fract(L * 3.7)) + L * 97.0, 1.3 + L * 13.0));
-  float base = (0.07 + 0.16 * fract(L * 7.13)) * m * m * m * (uLand.z * 2.0);
-  return 0.006 + base + 0.012 * (uLand.w * 2.0) * vnoise(vec2(az * 26.0 + L * 41.0, 4.0));
+  return 0.006 + (0.07 + 0.16 * fract(L * 7.13)) * m * m * m * height + 0.012 * rough * vnoise(vec2(az * 26.0 + L * 41.0, 4.0));
 }
 
 void main() {
@@ -245,7 +284,8 @@ void main() {
     } else {
       col = sky(rd, jit);
     }
-  } else {
+  } else if (uWater.x > 0.5) {
+    // lake: reflect sky and land, with gentle ripples
     vec2 g = rd.xz / max(-rd.y, 0.002);
     float rip = (vnoise(g * vec2(0.8, 5.0) + vec2(0.0, uTime * 0.25)) - 0.5) * 0.02 * uWater.y;
     vec3 rr = normalize(vec3(rd.x + rip * 0.3, -rd.y + rip, rd.z));
@@ -253,6 +293,9 @@ void main() {
     vec3 rc = (rel < ridge(atan(rr.x, rr.z))) ? uLandColor * 0.7 : sky(rr, jit);
     float fres = mix(0.92, 0.5, smoothstep(0.0, 0.4, -rd.y)) * (uWater.z / 0.7);
     col = rc * fres + vec3(0.002, 0.004, 0.006);
+  } else {
+    // dry ground, faintly lit by the sky near the horizon
+    col = uLandColor * 0.6 + 0.004 * vec3(0.2, 0.5, 0.4) * exp(el * 12.0);
   }
   outColor = vec4(col * uHdrOut, 1.0);
 }

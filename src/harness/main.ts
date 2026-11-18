@@ -7,6 +7,8 @@ const canvas = document.createElement('canvas')
 document.body.append(canvas)
 const renderer = new Renderer(canvas)
 const parse = (json: string) => clampScene(JSON.parse(json))
+// The extension can't be fetched while the context is lost, so keep it from the start.
+const loseExt = canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!
 
 const harness = {
   async render(json: string, t: number, w: number, h: number, q: Quality): Promise<number[]> {
@@ -18,7 +20,7 @@ const harness = {
     return Array.from(renderer.readPixels())
   },
   loseContext(): void {
-    canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!.loseContext()
+    loseExt.loseContext()
   },
   async restoreContext(): Promise<void> {
     const restored = new Promise<void>((resolve) => {
@@ -27,18 +29,26 @@ const harness = {
         resolve()
       })
     })
-    canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!.restoreContext()
+    loseExt.restoreContext()
     await restored
   },
 }
-Object.assign(window, { harness })
+// ?view=1 animates a scene for checking by eye; harness.setView(json) swaps the scene shown.
+let viewScene = defaultScene()
+Object.assign(window, {
+  harness: {
+    ...harness,
+    setView(json: string) {
+      viewScene = parse(json)
+    },
+  },
+})
 
-// ?view=1 shows the default scene animating, to compare against the prototype by eye.
 if (new URLSearchParams(location.search).has('view')) {
-  const scene = defaultScene()
   const start = performance.now()
   const loop = () => {
-    renderer.render(scene, 30 + (performance.now() - start) / 1000, { width: 960, height: 540 }, 'preview')
+    const a = viewScene.frame.aspectW / viewScene.frame.aspectH
+    renderer.render(viewScene, viewScene.time + (performance.now() - start) / 1000, { width: Math.round(540 * a), height: 540 }, 'preview')
     requestAnimationFrame(loop)
   }
   loop()

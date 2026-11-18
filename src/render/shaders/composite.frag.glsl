@@ -2,6 +2,7 @@
 precision highp float;
 
 uniform sampler2D uHdr;
+uniform sampler2D uBloom; // covers the full image, low resolution
 uniform vec2 uFullRes;
 uniform vec2 uTileOrigin;
 uniform float uTime;
@@ -21,6 +22,7 @@ void main() {
   vec2 fc = gl_FragCoord.xy + uTileOrigin;
   vec2 uv = (fc - 0.5 * uFullRes) / (0.5 * uFullRes.x);
 
+  col += texture(uBloom, fc / uFullRes).rgb * uHdrScale * uFx[1] * 0.8;
   col = 1.0 - exp(-col * 1.9 * exp2(uFx[0]));
   float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
   col = mix(vec3(l), col, uFx[2]);

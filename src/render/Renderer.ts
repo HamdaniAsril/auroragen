@@ -3,6 +3,7 @@ import { createTarget, deleteTarget, Program, type Target } from './gl'
 import { sceneToUniforms } from './uniforms'
 import compositeFrag from './shaders/composite.frag.glsl?raw'
 import fullscreenVert from './shaders/fullscreen.vert.glsl?raw'
+import bloomFrag from './shaders/bloom.frag.glsl?raw'
 import sceneFrag from './shaders/scene.frag.glsl?raw'
 
 export type Quality = 'preview' | 'refine' | 'export'
@@ -19,6 +20,8 @@ export interface RenderTarget {
   height: number
   /** Region of the full image in top-left pixel coordinates. */
   tile?: TileRect
+  /** Skip recomputing bloom; use the source from the last renderBloomSource() call. */
+  reuseBloom?: boolean
 }
 
 export class RendererUnsupportedError extends Error {
@@ -28,11 +31,20 @@ export class RendererUnsupportedError extends Error {
 }
 
 const STEPS: Record<Quality, number> = { preview: 64, refine: 112, export: 160 }
+/** Long side of the low-res full-frame render that bloom is computed from. Same for full frames and tiles. */
+const BLOOM_SIDE: Record<Quality, number> = { preview: 256, refine: 384, export: 512 }
+const BLOOM_LEVELS = 4
 
 export class Renderer {
   private gl: WebGL2RenderingContext
   private scene!: Program
   private composite!: Program
+  private bloom!: Program
+  private bloomSrc?: Target
+  private bloomDown: Target[] = []
+  private bloomUp: Target[] = []
+  private black!: Target
+  private bloomTex?: WebGLTexture
   private vao!: WebGLVertexArrayObject
   private hdr?: Target
   private floatTargets = false
@@ -67,8 +79,91 @@ export class Renderer {
     this.floatTargets = !!gl.getExtension('EXT_color_buffer_float')
     this.scene = new Program(gl, fullscreenVert, sceneFrag)
     this.composite = new Program(gl, fullscreenVert, compositeFrag)
+    this.bloom = new Program(gl, fullscreenVert, bloomFrag)
     this.vao = gl.createVertexArray()
     this.hdr = undefined
+    this.bloomSrc = undefined
+    this.bloomDown = []
+    this.bloomUp = []
+    this.black = createTarget(gl, 1, 1, false)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.black.fb)
+    gl.clearColor(0, 0, 0, 1)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.bloomTex = undefined
+  }
+
+  private sized(t: Target | undefined, w: number, h: number): Target {
+    if (t && t.w === w && t.h === h) return t
+    deleteTarget(this.gl, t)
+    return createTarget(this.gl, w, h, this.floatTargets)
+  }
+
+  private drawScenePass(scene: Scene, time: number, W: number, H: number, tile: TileRect, quality: Quality, into: Target): void {
+    const gl = this.gl
+    gl.bindVertexArray(this.vao)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, into.fb)
+    gl.viewport(0, 0, tile.w, tile.h)
+    this.scene.use({
+      ...sceneToUniforms(scene, time, W / H),
+      uFullRes: [W, H],
+      uTileOrigin: [tile.x, H - tile.y - tile.h],
+      uSteps: STEPS[quality],
+      uJitter: quality === 'preview' ? 1 : 0,
+      uHdrOut: this.floatTargets ? 1 : 0.25,
+    })
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+  }
+
+  /** Renders a low-res full frame and blurs it into the bloom texture used by the next render(s). */
+  renderBloomSource(scene: Scene, time: number, aspect: number, quality: Quality): void {
+    const gl = this.gl
+    if (this.lost || gl.isContextLost()) return
+    if (scene.effects.bloom <= 0) {
+      this.bloomTex = this.black.tex
+      return
+    }
+    const side = BLOOM_SIDE[quality]
+    const bw = Math.max(16, Math.round(aspect >= 1 ? side : side * aspect))
+    const bh = Math.max(16, Math.round(aspect >= 1 ? side / aspect : side))
+    this.bloomSrc = this.sized(this.bloomSrc, bw, bh)
+    this.drawScenePass(scene, time, bw, bh, { x: 0, y: 0, w: bw, h: bh }, quality, this.bloomSrc)
+
+    let src = this.bloomSrc
+    for (let i = 0; i < BLOOM_LEVELS; i++) {
+      const w = Math.max(1, src.w >> 1)
+      const h = Math.max(1, src.h >> 1)
+      this.bloomDown[i] = this.sized(this.bloomDown[i], w, h)
+      this.bloomPass(i === 0 ? 0 : 1, src, this.bloomDown[i])
+      src = this.bloomDown[i]
+    }
+    let acc = this.bloomDown[BLOOM_LEVELS - 1]
+    for (let i = BLOOM_LEVELS - 2; i >= 0; i--) {
+      const base = this.bloomDown[i]
+      this.bloomUp[i] = this.sized(this.bloomUp[i], base.w, base.h)
+      this.bloomPass(2, acc, this.bloomUp[i], base)
+      acc = this.bloomUp[i]
+    }
+    this.bloomTex = acc.tex
+  }
+
+  private bloomPass(mode: number, src: Target, dst: Target, base?: Target): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb)
+    gl.viewport(0, 0, dst.w, dst.h)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, src.tex)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, (base ?? this.black).tex)
+    this.bloom.use({
+      uSrc: 0,
+      uBase: 1,
+      uSrcTexel: [1 / src.w, 1 / src.h],
+      uDstSize: [dst.w, dst.h],
+      uMode: mode,
+      uThreshold: 0.08,
+    })
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 
   private ensureHdr(w: number, h: number): Target {
@@ -89,27 +184,25 @@ export class Renderer {
     if (this.canvas.width !== tile.w) this.canvas.width = tile.w
     if (this.canvas.height !== tile.h) this.canvas.height = tile.h
 
-    const u = sceneToUniforms(scene, time, W / H)
-    const frame = { uFullRes: [W, H], uTileOrigin: [tile.x, H - tile.y - tile.h] }
+    if (!target.reuseBloom || !this.bloomTex) this.renderBloomSource(scene, time, W / H, quality)
     const hdr = this.ensureHdr(tile.w, tile.h)
-
-    gl.bindVertexArray(this.vao)
-    gl.bindFramebuffer(gl.FRAMEBUFFER, hdr.fb)
-    gl.viewport(0, 0, tile.w, tile.h)
-    this.scene.use({
-      ...u,
-      ...frame,
-      uSteps: STEPS[quality],
-      uJitter: quality === 'preview' ? 1 : 0,
-      uHdrOut: this.floatTargets ? 1 : 0.25,
-    })
-    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    this.drawScenePass(scene, time, W, H, tile, quality, hdr)
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     gl.viewport(0, 0, tile.w, tile.h)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, hdr.tex)
-    this.composite.use({ ...frame, uHdr: 0, uTime: time, uFx: u.uFx, uHdrScale: this.floatTargets ? 1 : 4 })
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.bloomTex ?? this.black.tex)
+    this.composite.use({
+      uFullRes: [W, H],
+      uTileOrigin: [tile.x, H - tile.y - tile.h],
+      uHdr: 0,
+      uBloom: 1,
+      uTime: time,
+      uFx: [scene.effects.exposure, scene.effects.bloom, scene.effects.saturation, scene.effects.grain, scene.effects.vignette],
+      uHdrScale: this.floatTargets ? 1 : 4,
+    })
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 
@@ -136,9 +229,10 @@ export class Renderer {
     this.canvas.removeEventListener('webglcontextlost', this.onLost)
     this.canvas.removeEventListener('webglcontextrestored', this.onRestoredEvent)
     this.restoredListeners.clear()
-    deleteTarget(gl, this.hdr)
+    for (const t of [this.hdr, this.bloomSrc, this.black, ...this.bloomDown, ...this.bloomUp]) deleteTarget(gl, t)
     this.scene.dispose()
     this.composite.dispose()
+    this.bloom.dispose()
     gl.deleteVertexArray(this.vao)
   }
 }
