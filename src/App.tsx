@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { detectLang } from './i18n/strings'
 import { studio, useStudio } from './state/store'
+import { Inspector } from './ui/Inspector'
 import { PlayBar } from './ui/PlayBar'
 import { Preview } from './ui/Preview'
 import { Toaster } from './ui/Toast'
@@ -39,7 +40,9 @@ export default function App() {
         <Preview />
         <PlayBar />
       </main>
-      <aside className="panel right" />
+      <aside className="panel right">
+        <Inspector />
+      </aside>
       <Toaster />
     </div>
   )
