@@ -52,3 +52,20 @@ test('playing advances liveTime by speed', () => {
   for (let i = 0; i < 62; i++) step(16)
   expect(loop.liveTime - t0).toBeCloseTo(2, 1)
 })
+
+test('100% view renders a centred tile of the full frame', () => {
+  const calls: RenderTarget[] = []
+  let pending: FrameRequestCallback[] = []
+  const loop = new PreviewLoop({ render: (_s, _t, target) => calls.push(target) }, () => defaultScene(), {
+    now: () => 0,
+    raf: (cb) => (pending.push(cb), pending.length),
+    caf: () => {},
+  })
+  loop.setView(800, 450, { width: 3840, height: 2160 })
+  loop.setPlaying(false)
+  loop.start()
+  const run = pending
+  pending = []
+  for (const cb of run) cb(0)
+  expect(calls[0]).toEqual({ width: 3840, height: 2160, tile: { x: 1520, y: 855, w: 800, h: 450 } })
+})

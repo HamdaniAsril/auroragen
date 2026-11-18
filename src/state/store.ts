@@ -22,6 +22,7 @@ export interface StudioState {
   exportSize: { w: number; h: number }
   format: ExportFormat
   quality: number
+  zoom: 'fit' | '100'
   history: History
   update(fn: (s: Scene) => void, key?: string): void
   updateLayer(i: number, patch: Partial<AuroraLayer>, key?: string): void
@@ -38,6 +39,7 @@ export interface StudioState {
   setTime(t: number): void
   setLang(l: Lang): void
   setExport(patch: Partial<Pick<StudioState, 'exportSize' | 'format' | 'quality'>>): void
+  setZoom(z: 'fit' | '100'): void
 }
 
 interface StoreOptions {
@@ -67,6 +69,7 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
       exportSize: { w: 3840, h: 2160 },
       format: 'png',
       quality: 0.92,
+      zoom: 'fit',
       history: { past: [], future: [] },
 
       update(fn, key) {
@@ -159,6 +162,10 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
 
       setExport(patch) {
         set(patch)
+      },
+
+      setZoom(z) {
+        set({ zoom: z })
       },
     }
   })

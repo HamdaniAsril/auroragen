@@ -31,6 +31,8 @@ export class PreviewLoop {
   private lastFrame: number | undefined
   private viewW = 0
   private viewH = 0
+  /** At 100% zoom the view shows a 1:1 centred crop of the full export frame. */
+  private full: { width: number; height: number } | undefined
   private rafId: number | undefined
 
   constructor(r: Pick<Renderer, 'render'>, getScene: () => Scene, opts: LoopOptions = {}) {
@@ -77,13 +79,22 @@ export class PreviewLoop {
     this.lastChange = this.now()
   }
 
-  setView(w: number, h: number): void {
+  setView(w: number, h: number, full?: { width: number; height: number }): void {
     this.viewW = Math.max(1, Math.round(w))
     this.viewH = Math.max(1, Math.round(h))
+    this.full = full
     this.invalidate()
   }
 
   private draw(scale: number, quality: 'preview' | 'refine'): void {
+    if (this.full) {
+      const { width, height } = this.full
+      const w = Math.min(this.viewW, width)
+      const h = Math.min(this.viewH, height)
+      const tile = { x: Math.round((width - w) / 2), y: Math.round((height - h) / 2), w, h }
+      this.r.render(this.getScene(), this.time, { width, height, tile }, quality)
+      return
+    }
     const width = Math.max(1, Math.round(this.viewW * scale))
     const height = Math.max(1, Math.round(this.viewH * scale))
     this.r.render(this.getScene(), this.time, { width, height }, quality)

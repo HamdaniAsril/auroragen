@@ -25,3 +25,12 @@ test('caps history at 100 and clears the redo stack', () => {
   expect(h.past).toHaveLength(100)
   expect(h.future).toHaveLength(0)
 })
+
+test('gesture keys coalesce for the whole gesture, however slow', () => {
+  let h = record(empty, defaultScene(), 'camera.drag#1', 0)
+  h = record(h, defaultScene(), 'camera.drag#1', 2000)
+  h = record(h, defaultScene(), 'camera.drag#1', 9000)
+  expect(h.past).toHaveLength(1)
+  h = record(h, defaultScene(), 'camera.drag#2', 9100)
+  expect(h.past).toHaveLength(2)
+})
