@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { detectLang } from './i18n/strings'
+import { PRESETS } from './presets/presets'
 import { studio, useStudio } from './state/store'
 import { Inspector } from './ui/Inspector'
+import { LibraryPanel } from './ui/LibraryPanel'
 import { PlayBar } from './ui/PlayBar'
 import { Preview } from './ui/Preview'
 import { Toaster } from './ui/Toast'
@@ -24,6 +26,8 @@ export default function App() {
 
   useEffect(() => {
     studio.getState().setLang(detectLang(navigator.languages ?? [navigator.language]))
+    // The opening scene is the first preset.
+    if (!studio.getState().dirty) studio.setState({ presetId: PRESETS[0].id })
   }, [])
 
   useEffect(() => {
@@ -35,7 +39,9 @@ export default function App() {
   return (
     <div className="studio">
       <TopBar />
-      <aside className="panel left" />
+      <aside className="panel left">
+        <LibraryPanel />
+      </aside>
       <main className="stage">
         <Preview />
         <PlayBar />

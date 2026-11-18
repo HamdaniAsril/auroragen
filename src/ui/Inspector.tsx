@@ -1,4 +1,5 @@
 import { useT } from '../i18n/useT'
+import { PRESETS } from '../presets/presets'
 import { defaultScene } from '../scene/defaults'
 import { studio } from '../state/store'
 import { AuroraSection } from './sections/AuroraSection'
@@ -7,6 +8,14 @@ import { EffectsSection } from './sections/EffectsSection'
 import { FrameSection } from './sections/FrameSection'
 import { LandSection } from './sections/LandSection'
 import { SkySection } from './sections/SkySection'
+
+/** Back to the preset the scene came from, or to the default scene. */
+function reset() {
+  const st = studio.getState()
+  const preset = PRESETS.find((p) => p.id === st.presetId)
+  if (preset) st.applyPreset(preset)
+  else st.loadScene(defaultScene(), { keepFrame: true })
+}
 
 export function Inspector() {
   const t = useT()
@@ -19,7 +28,7 @@ export function Inspector() {
       <CameraSection />
       <EffectsSection />
       <div className="inspector-foot">
-        <button type="button" className="btn wide" onClick={() => studio.getState().loadScene(defaultScene(), { keepFrame: true })}>
+        <button type="button" className="btn wide" onClick={reset}>
           {t('section.reset')}
         </button>
       </div>

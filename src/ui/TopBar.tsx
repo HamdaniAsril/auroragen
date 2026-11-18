@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n/useT'
 import { studio, useStudio } from '../state/store'
+import { PRESETS } from '../presets/presets'
 import { ExportDialog } from './ExportDialog'
+import { SaveDialog } from './SaveDialog'
 import { DiceIcon, RedoIcon, UndoIcon } from './icons'
 
 export function TopBar() {
@@ -12,6 +14,8 @@ export function TopBar() {
   const lang = useStudio((s) => s.lang)
   const zoom = useStudio((s) => s.zoom)
   const [exporting, setExporting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const presetName = useStudio((s) => PRESETS.find((p) => p.id === s.presetId)?.name[s.lang])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -31,6 +35,7 @@ export function TopBar() {
     <header className="topbar">
       <div className="brand">
         <span className="brand-name">{t('app.name')}</span>
+        {presetName && <span className="preset-name">{presetName}</span>}
         {dirty && <span className="dirty" role="img" aria-label={t('top.unsaved')} title={t('top.unsaved')} />}
       </div>
       <div className="tool-group">
@@ -59,13 +64,14 @@ export function TopBar() {
       <button type="button" className="btn" disabled>
         {t('top.share')}
       </button>
-      <button type="button" className="btn" disabled>
+      <button type="button" className="btn" onClick={() => setSaving(true)}>
         {t('top.save')}
       </button>
       <button type="button" className="btn primary" onClick={() => setExporting(true)}>
         {t('top.export')}
       </button>
       <ExportDialog open={exporting} onClose={() => setExporting(false)} />
+      {saving && <SaveDialog open onClose={() => setSaving(false)} defaultName={presetName ?? t('app.name')} />}
     </header>
   )
 }
