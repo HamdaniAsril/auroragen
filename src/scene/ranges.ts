@@ -41,6 +41,7 @@ export const RANGES = {
   'camera.lens': { min: 12, max: 50, step: 1 },
   'effects.exposure': { min: -2, max: 2, step: 0.05 },
   time: { min: 0, max: 600, step: 0.01 },
+  'export.quality': { min: 0.5, max: 1, step: 0.01 },
 } as const satisfies Record<string, Range>
 
 export type RangePath = keyof typeof RANGES

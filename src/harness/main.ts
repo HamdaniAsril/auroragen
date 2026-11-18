@@ -1,7 +1,10 @@
 // Dev-only page that lets Playwright drive the renderer directly.
 import { clampScene } from '../scene/clamp'
 import { defaultScene } from '../scene/defaults'
+import { encodeCanvas } from '../export/encode'
+import { renderToCanvas } from '../export/exportImage'
 import { Renderer, type Quality, type TileRect } from '../render/Renderer'
+import type { ExportFormat } from '../state/store'
 
 const canvas = document.createElement('canvas')
 document.body.append(canvas)
@@ -18,6 +21,24 @@ const harness = {
   async renderTile(json: string, t: number, w: number, h: number, tile: TileRect): Promise<number[]> {
     renderer.render(parse(json), t, { width: w, height: h, tile }, 'export')
     return Array.from(renderer.readPixels())
+  },
+  async export(json: string, t: number, w: number, h: number, format: ExportFormat): Promise<number[]> {
+    const c = await renderToCanvas({ scene: parse(json), time: t, width: w, height: h })
+    const blob = await encodeCanvas(c, format, 0.9)
+    return Array.from(new Uint8Array(await blob.arrayBuffer()))
+  },
+  async exportPixels(json: string, t: number, w: number, h: number): Promise<number[]> {
+    const c = await renderToCanvas({ scene: parse(json), time: t, width: w, height: h })
+    return Array.from(c.getContext('2d')!.getImageData(0, 0, w, h).data)
+  },
+  async exportCancel(json: string, t: number, w: number, h: number): Promise<string> {
+    const ac = new AbortController()
+    try {
+      await renderToCanvas({ scene: parse(json), time: t, width: w, height: h, signal: ac.signal, onProgress: () => ac.abort() })
+      return 'finished'
+    } catch (e) {
+      return (e as Error).name
+    }
   },
   loseContext(): void {
     loseExt.loseContext()

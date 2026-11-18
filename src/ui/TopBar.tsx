@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useT } from '../i18n/useT'
 import { studio, useStudio } from '../state/store'
+import { ExportDialog } from './ExportDialog'
 import { DiceIcon, RedoIcon, UndoIcon } from './icons'
 
 export function TopBar() {
@@ -10,6 +11,7 @@ export function TopBar() {
   const dirty = useStudio((s) => s.dirty)
   const lang = useStudio((s) => s.lang)
   const zoom = useStudio((s) => s.zoom)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,9 +62,10 @@ export function TopBar() {
       <button type="button" className="btn" disabled>
         {t('top.save')}
       </button>
-      <button type="button" className="btn primary" disabled>
+      <button type="button" className="btn primary" onClick={() => setExporting(true)}>
         {t('top.export')}
       </button>
+      <ExportDialog open={exporting} onClose={() => setExporting(false)} />
     </header>
   )
 }

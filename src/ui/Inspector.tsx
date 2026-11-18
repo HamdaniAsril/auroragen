@@ -4,6 +4,7 @@ import { studio } from '../state/store'
 import { AuroraSection } from './sections/AuroraSection'
 import { CameraSection } from './sections/CameraSection'
 import { EffectsSection } from './sections/EffectsSection'
+import { FrameSection } from './sections/FrameSection'
 import { LandSection } from './sections/LandSection'
 import { SkySection } from './sections/SkySection'
 
@@ -11,6 +12,7 @@ export function Inspector() {
   const t = useT()
   return (
     <div className="inspector">
+      <FrameSection />
       <AuroraSection />
       <SkySection />
       <LandSection />
