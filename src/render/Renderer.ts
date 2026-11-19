@@ -55,7 +55,7 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
-    const gl = canvas.getContext('webgl2', { antialias: false, premultipliedAlpha: false, alpha: false })
+    const gl = canvas.getContext('webgl2', { antialias: false, premultipliedAlpha: false, alpha: true })
     if (!gl) throw new RendererUnsupportedError()
     this.gl = gl
     canvas.addEventListener('webglcontextlost', this.onLost)
@@ -202,6 +202,7 @@ export class Renderer {
       uTime: time,
       uFx: [scene.effects.exposure, scene.effects.bloom, scene.effects.saturation, scene.effects.grain, scene.effects.vignette],
       uHdrScale: this.floatTargets ? 1 : 4,
+      uAuroraOnly: scene.frame.auroraOnly ? 1 : 0,
     })
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }

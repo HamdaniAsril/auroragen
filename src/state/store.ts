@@ -53,10 +53,17 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
   const rand = opts.rand ?? Math.random
 
   return createStore<StudioState>((set, get) => {
+    /** JPG has no transparency, so an aurora-only scene exports as PNG instead. */
+    const keepFormatValid = () => {
+      if (get().scene.frame.auroraOnly && get().format === 'jpg') set({ format: 'png' })
+    }
+
     /** Replaces the scene and records the previous one as an undo step. */
     const commit = (next: Scene, key?: string, extra: Partial<StudioState> = {}) => {
       const { scene, history } = get()
-      set({ scene: clampScene(next), history: record(history, scene, key, now()), dirty: true, ...extra })
+      const clamped = clampScene(next)
+      set({ scene: clamped, history: record(history, scene, key, now()), dirty: true, ...extra })
+      keepFormatValid()
     }
 
     return {
@@ -132,6 +139,7 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
           activeLayer: Math.min(get().activeLayer, prev.layers.length - 1),
           dirty: true,
         })
+        keepFormatValid()
       },
 
       redo() {
@@ -145,6 +153,7 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
           activeLayer: Math.min(get().activeLayer, next.layers.length - 1),
           dirty: true,
         })
+        keepFormatValid()
       },
 
       setPlaying(b) {
@@ -165,6 +174,7 @@ export function createStudioStore(initial?: Scene, opts: StoreOptions = {}): Sto
 
       setExport(patch) {
         set(patch)
+        keepFormatValid()
       },
 
       setZoom(z) {

@@ -27,9 +27,15 @@ test('rejects bad enums, hex and frame', () => {
   expect(s.layers[0].type).toBe('tirai')
   expect(s.layers[0].colors.bottom).toBe(PALETTES['classic-green'].bottom)
   expect(s.land.type).toBe('mountains')
-  expect(s.frame).toEqual({ aspectW: 16, aspectH: 9 })
+  expect(s.frame).toEqual({ aspectW: 16, aspectH: 9, auroraOnly: false })
 })
 
 test('never throws on garbage', () => {
   for (const g of [null, 42, 'x', [], { layers: 'no' }]) expect(() => clampScene(g)).not.toThrow()
+})
+
+test('aurora-only defaults to off and survives a bad aspect', () => {
+  expect(clampScene({}).frame.auroraOnly).toBe(false)
+  expect(clampScene({ frame: { aspectW: 4, aspectH: 5, auroraOnly: 'yes' } }).frame.auroraOnly).toBe(false)
+  expect(clampScene({ frame: { aspectW: 0, aspectH: 5, auroraOnly: true } }).frame).toEqual({ aspectW: 16, aspectH: 9, auroraOnly: true })
 })

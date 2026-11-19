@@ -24,6 +24,7 @@ export function Preview({ renderer }: Props) {
   const type = useStudio((s) => s.scene.layers[0].type)
   const aspectW = useStudio((s) => s.scene.frame.aspectW)
   const aspectH = useStudio((s) => s.scene.frame.aspectH)
+  const auroraOnly = useStudio((s) => s.scene.frame.auroraOnly)
   const zoom = useStudio((s) => s.zoom)
   const exportSize = useStudio((s) => s.exportSize)
   const [box, setBox] = useState({ w: 0, h: 0 })
@@ -152,6 +153,7 @@ export function Preview({ renderer }: Props) {
       <div className="frame" style={{ width: box.w, height: box.h }}>
         <canvas
           ref={canvasRef}
+          className={auroraOnly ? 'cutout' : undefined}
           role="img"
           aria-label={t('preview.label', { type: t(`type.${type}`) })}
           onPointerDown={onPointerDown}

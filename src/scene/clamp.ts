@@ -61,7 +61,8 @@ function clampLayer(input: unknown): AuroraLayer {
 function clampFrame(input: unknown, fallback: Frame): Frame {
   const o = obj(input)
   const ok = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 10000
-  return ok(o.aspectW) && ok(o.aspectH) ? { aspectW: o.aspectW as number, aspectH: o.aspectH as number } : fallback
+  const auroraOnly = bool(o.auroraOnly, fallback.auroraOnly)
+  return ok(o.aspectW) && ok(o.aspectH) ? { aspectW: o.aspectW as number, aspectH: o.aspectH as number, auroraOnly } : { ...fallback, auroraOnly }
 }
 
 /** Turns anything into a valid Scene: fills gaps from defaults and clamps every value. Never throws. */

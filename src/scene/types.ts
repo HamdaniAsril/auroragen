@@ -57,6 +57,8 @@ export interface Effects {
 export interface Frame {
   aspectW: number
   aspectH: number
+  /** Draw only the aurora, on a transparent background. */
+  auroraOnly: boolean
 }
 
 export interface Scene {

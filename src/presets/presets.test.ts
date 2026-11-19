@@ -5,7 +5,7 @@ import { PALETTES } from '../scene/palettes'
 import { AURORA_TYPES, LAND_TYPES } from '../scene/types'
 import { filterPresets, PRESETS } from './presets'
 
-const frame = { aspectW: 16, aspectH: 9 }
+const frame = { aspectW: 16, aspectH: 9, auroraOnly: false }
 
 test('there are 16–24 presets with unique ids', () => {
   expect(PRESETS.length).toBeGreaterThanOrEqual(16)

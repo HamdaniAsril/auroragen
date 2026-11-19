@@ -27,7 +27,7 @@ test('export matches the preview at the same aspect', async ({ page }) => {
 })
 
 test('portrait export matches preview framing', async ({ page }) => {
-  const s = { ...defaultScene(), frame: { aspectW: 9, aspectH: 16 } }
+  const s = { ...defaultScene(), frame: { aspectW: 9, aspectH: 16, auroraOnly: false } }
   const preview = await renderPixels(page, s, 30, 90, 160, 'preview')
   const exp = downsample2x(await exportPixels(page, s, 180, 320), 180, 320)
   expect(meanAbsDiff(preview, exp)).toBeLessThan(8)

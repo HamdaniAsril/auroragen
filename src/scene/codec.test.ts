@@ -7,9 +7,9 @@ import { RENDERER_VERSION } from './types'
 test('round-trips the default scene', () => expect(decodeScene(encodeScene(defaultScene()))).toEqual(defaultScene()))
 
 test('keeps frame aspect and renderer version', () => {
-  const s = { ...defaultScene(), frame: { aspectW: 9, aspectH: 16 } }
+  const s = { ...defaultScene(), frame: { aspectW: 9, aspectH: 16, auroraOnly: false } }
   const d = decodeScene(encodeScene(s))!
-  expect(d.frame).toEqual({ aspectW: 9, aspectH: 16 })
+  expect(d.frame).toEqual({ aspectW: 9, aspectH: 16, auroraOnly: false })
   expect(d.renderer).toBe(RENDERER_VERSION)
 })
 

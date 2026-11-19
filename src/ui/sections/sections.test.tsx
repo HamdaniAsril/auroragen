@@ -4,8 +4,9 @@ import { defaultScene } from '../../scene/defaults'
 import { studio } from '../../state/store'
 import { Inspector } from '../Inspector'
 import { AuroraSection } from './AuroraSection'
+import { FrameSection } from './FrameSection'
 
-beforeEach(() => studio.setState({ scene: defaultScene(), activeLayer: 0, lang: 'id', history: { past: [], future: [] } }))
+beforeEach(() => studio.setState({ scene: defaultScene(), activeLayer: 0, lang: 'id', history: { past: [], future: [] }, format: 'png' }))
 afterEach(() => vi.restoreAllMocks())
 
 test('add layer stops at 4', () => {
@@ -37,4 +38,17 @@ test('aurora seed and land seed are separate controls', () => {
   fireEvent.click(getByRole('button', { name: /Acak Bentuk daratan/ }))
   expect(studio.getState().scene.layers[0].seed).toBe(1207)
   expect(studio.getState().scene.land.seed).toBe(5000)
+})
+
+test('aurora only is a background choice, and it turns JPG off', () => {
+  const { getByRole } = render(<FrameSection />)
+  fireEvent.click(getByRole('button', { name: 'JPG' }))
+  expect(studio.getState().format).toBe('jpg')
+  fireEvent.click(getByRole('button', { name: 'Aurora saja' }))
+  expect(studio.getState().scene.frame.auroraOnly).toBe(true)
+  expect(studio.getState().format).toBe('png')
+  expect((getByRole('button', { name: 'JPG' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(getByRole('button', { name: 'Pemandangan' }))
+  expect(studio.getState().scene.frame.auroraOnly).toBe(false)
+  expect((getByRole('button', { name: 'JPG' }) as HTMLButtonElement).disabled).toBe(false)
 })

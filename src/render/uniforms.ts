@@ -26,6 +26,7 @@ export interface Uniforms {
   uWater: Vec3
   uCam: [number, number, number, number]
   uFx: [number, number, number, number, number]
+  uAuroraOnly: number
 }
 
 const RAD = Math.PI / 180
@@ -65,6 +66,7 @@ export function sceneToUniforms(scene: Scene, time: number, aspect: number): Uni
     uLand: [LAND_TYPES.indexOf(scene.land.type), fract(scene.land.seed * 0.7548777), scene.land.height, scene.land.roughness],
     uLandColor: hexToLinear(scene.land.color),
     uWater: [scene.land.water.enabled ? 1 : 0, scene.land.water.ripple, scene.land.water.reflection],
+    uAuroraOnly: scene.frame.auroraOnly ? 1 : 0,
     uCam: [0, 0, 0, 0],
     uFx: [
       scene.effects.exposure,

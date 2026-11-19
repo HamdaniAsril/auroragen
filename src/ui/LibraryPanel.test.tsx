@@ -23,7 +23,7 @@ const memory = vi.hoisted(() => {
 })
 vi.mock('../state/saved', async (orig) => ({ ...(await orig<typeof import('../state/saved')>()), getStorage: () => memory }))
 
-beforeEach(() => studio.setState({ scene: { ...defaultScene(), frame: { aspectW: 9, aspectH: 16 } }, lang: 'id', presetId: null }))
+beforeEach(() => studio.setState({ scene: { ...defaultScene(), frame: { aspectW: 9, aspectH: 16, auroraOnly: false } }, lang: 'id', presetId: null }))
 
 test('clicking a preset applies it and keeps the frame', () => {
   const p = PRESETS[2]
@@ -31,7 +31,7 @@ test('clicking a preset applies it and keeps the frame', () => {
   fireEvent.click(getByRole('button', { name: p.name.id }))
   expect(studio.getState().presetId).toBe(p.id)
   expect(studio.getState().scene.layers[0].type).toBe(p.type)
-  expect(studio.getState().scene.frame).toEqual({ aspectW: 9, aspectH: 16 })
+  expect(studio.getState().scene.frame).toEqual({ aspectW: 9, aspectH: 16, auroraOnly: false })
 })
 
 test('search narrows the list', () => {
@@ -44,11 +44,11 @@ test('search narrows the list', () => {
 test('a saved scene opens with its own frame', async () => {
   const { addSaved } = await import('../state/saved')
   memory.clear()
-  addSaved(memory, 'Wallpaper', { ...defaultScene(), frame: { aspectW: 215, aspectH: 466 } })
+  addSaved(memory, 'Wallpaper', { ...defaultScene(), frame: { aspectW: 215, aspectH: 466, auroraOnly: false } })
   studio.setState({ scene: defaultScene() })
   const { getByRole } = render(<LibraryPanel />)
   fireEvent.click(getByRole('tab', { name: 'Tersimpan' }))
   fireEvent.click(getByRole('button', { name: 'Wallpaper' }))
-  expect(studio.getState().scene.frame).toEqual({ aspectW: 215, aspectH: 466 })
+  expect(studio.getState().scene.frame).toEqual({ aspectW: 215, aspectH: 466, auroraOnly: false })
   expect(studio.getState().exportSize).toEqual({ w: 1290, h: 2796 })
 })

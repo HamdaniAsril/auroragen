@@ -27,7 +27,7 @@ export function defaultScene(): Scene {
     v: SCENE_VERSION,
     renderer: RENDERER_VERSION,
     time: 30,
-    frame: { aspectW: 16, aspectH: 9 },
+    frame: { aspectW: 16, aspectH: 9, auroraOnly: false },
     layers: [defaultLayer()],
     sky: {
       zenith: '#0A1424',

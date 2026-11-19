@@ -30,6 +30,7 @@ uniform vec4 uLand;         // type, seed, height, roughness
 uniform vec3 uLandColor;
 uniform vec3 uWater;        // enabled, ripple, reflection
 uniform vec4 uCam;          // pitchRad, yawRad, tanHalfX, tanHalfY
+uniform float uAuroraOnly;  // 1: only the aurora, everything else black (made transparent later)
 
 out vec4 outColor;
 
@@ -292,6 +293,11 @@ void main() {
   vec3 up = cross(fw, rt);
   vec3 rd = normalize(fw + ndc.x * uCam.z * rt + ndc.y * uCam.w * up);
   float jit = uJitter > 0.5 ? h21(fc + fract(uTime * 7.0) * vec2(91.0, 37.0)) : 0.5;
+
+  if (uAuroraOnly > 0.5) {
+    outColor = vec4(aurora(rd, jit) * uHdrOut, 1.0);
+    return;
+  }
 
   float az = atan(rd.x, rd.z);
   float el = asin(clamp(rd.y, -1.0, 1.0));

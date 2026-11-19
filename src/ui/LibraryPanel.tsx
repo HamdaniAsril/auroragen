@@ -32,7 +32,7 @@ function PresetList() {
   const [type, setType] = useState<AuroraType | undefined>()
   const list = filterPresets(PRESETS, { query, type, lang })
   const frame = useStudio((s) => s.scene.frame)
-  const scenes = useMemo(() => new Map(PRESETS.map((p) => [p.id, { ...p.scene, frame: { aspectW: 16, aspectH: 9 } }])), [])
+  const scenes = useMemo(() => new Map(PRESETS.map((p) => [p.id, { ...p.scene, frame: { aspectW: 16, aspectH: 9, auroraOnly: false } }])), [])
 
   return (
     <>
@@ -77,7 +77,7 @@ function SavedList() {
               studio.getState().loadScene(sceneOf(e))
               studio.setState({ presetId: null })
             }}>
-            <Thumb scene={{ ...sceneOf(e), frame: { aspectW: 16, aspectH: 9 } }} />
+            <Thumb scene={{ ...sceneOf(e), frame: { aspectW: 16, aspectH: 9, auroraOnly: false } }} />
             <span className="card-name" aria-hidden="true">
               {e.name}
             </span>

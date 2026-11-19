@@ -25,7 +25,7 @@ export const MIN_SIDE = 256
 
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b))
 
-export function reduceAspect(w: number, h: number): Frame {
+export function reduceAspect(w: number, h: number): Pick<Frame, 'aspectW' | 'aspectH'> {
   const g = gcd(w, h)
   return { aspectW: w / g, aspectH: h / g }
 }

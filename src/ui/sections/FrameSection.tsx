@@ -13,6 +13,7 @@ export function FrameSection() {
   const size = useStudio((s) => s.exportSize)
   const format = useStudio((s) => s.format)
   const quality = useStudio((s) => s.quality)
+  const auroraOnly = useStudio((s) => s.scene.frame.auroraOnly)
   const maxPixels = useMemo(deviceMaxPixels, [])
   const isPreset = SIZE_PRESETS.some((p) => p.w === size.w && p.h === size.h)
   const [custom, setCustom] = useState(!isPreset)
@@ -24,7 +25,7 @@ export function FrameSection() {
     const st = studio.getState()
     st.setExport({ exportSize: { w, h } })
     st.update((s) => {
-      s.frame = reduceAspect(w, h)
+      s.frame = { ...s.frame, ...reduceAspect(w, h) }
     }, 'frame')
   }
 
@@ -85,13 +86,36 @@ export function FrameSection() {
           {!draftCheck.ok && <p className="field-error">{reason(draftCheck)}</p>}
         </form>
       )}
+      <div className="seg backgrounds" role="group" aria-label={t('field.background')}>
+        {([false, true] as const).map((only) => (
+          <button
+            key={String(only)}
+            type="button"
+            aria-pressed={auroraOnly === only}
+            onClick={() =>
+              studio.getState().update((s) => {
+                s.frame.auroraOnly = only
+              }, 'frame.auroraOnly')
+            }
+          >
+            {t(only ? 'background.auroraOnly' : 'background.scene')}
+          </button>
+        ))}
+      </div>
       <div className="seg formats" role="group" aria-label={t('field.format')}>
         {FORMATS.map((f) => (
-          <button key={f} type="button" aria-pressed={format === f} onClick={() => studio.getState().setExport({ format: f })}>
+          <button
+            key={f}
+            type="button"
+            aria-pressed={format === f}
+            disabled={auroraOnly && f === 'jpg'}
+            onClick={() => studio.getState().setExport({ format: f })}
+          >
             {f.toUpperCase()}
           </button>
         ))}
       </div>
+      {auroraOnly && <p className="field-note">{t('background.note')}</p>}
       {format !== 'png' && (
         <SliderRow label={t('field.quality')} path="export.quality" value={quality} onChange={(v) => studio.getState().setExport({ quality: v })} />
       )}

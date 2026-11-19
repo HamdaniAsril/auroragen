@@ -226,6 +226,11 @@ select {
   touch-action: none;
 }
 
+.preview canvas.cutout {
+  /* checkerboard: the parts that will be transparent in the file */
+  background: repeating-conic-gradient(#1b222b 0% 25%, #11161c 0% 50%) 0 0 / 16px 16px;
+}
+
 .preview canvas:active {
   cursor: grabbing;
 }
@@ -654,8 +659,21 @@ select {
   font-size: 12px;
 }
 
-.formats {
+.formats,
+.backgrounds {
   justify-self: start;
+}
+
+.seg button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.field-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 /* ---------- dialog ---------- */
