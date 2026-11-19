@@ -5,8 +5,9 @@ import { studio } from '../state/store'
 import { AuroraSection } from './sections/AuroraSection'
 import { CameraSection } from './sections/CameraSection'
 import { EffectsSection } from './sections/EffectsSection'
-import { FrameSection } from './sections/FrameSection'
+import { BackgroundSection } from './sections/BackgroundSection'
 import { LandSection } from './sections/LandSection'
+import { SizeSection } from './sections/SizeSection'
 import { SkySection } from './sections/SkySection'
 
 /** Back to the preset the scene came from, or to the default scene. */
@@ -21,7 +22,8 @@ export function Inspector() {
   const t = useT()
   return (
     <div className="inspector">
-      <FrameSection />
+      <SizeSection />
+      <BackgroundSection />
       <AuroraSection />
       <SkySection />
       <LandSection />

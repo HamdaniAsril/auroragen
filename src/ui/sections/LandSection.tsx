@@ -12,9 +12,10 @@ import { LAND_THUMBS } from '../thumbs'
 export function LandSection() {
   const t = useT()
   const land = useStudio((s) => s.scene.land)
+  const auroraOnly = useStudio((s) => s.scene.frame.auroraOnly)
   const update = studio.getState().update
   return (
-    <Section title={t('section.land')}>
+    <Section title={t('section.land')} off={auroraOnly}>
       <VisualPicker
         label={t('field.landType')}
         options={LAND_TYPES.map((id) => ({ id, label: t(`land.${id}`), thumb: LAND_THUMBS[id] }))}

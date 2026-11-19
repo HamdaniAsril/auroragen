@@ -20,7 +20,32 @@ export function Advanced({ children }: { children: ReactNode }) {
   )
 }
 
-export function Section({ title, defaultOpen = true, advanced, children }: { title: string; defaultOpen?: boolean; advanced?: ReactNode; children: ReactNode }) {
+/** Dims and disables the controls inside, with a note saying why. Values are left as they are. */
+export function Off({ off, children }: { off: boolean; children: ReactNode }) {
+  const t = useT()
+  if (!off) return <>{children}</>
+  return (
+    <fieldset className="off" disabled>
+      <p className="field-note">{t('background.unused')}</p>
+      {children}
+    </fieldset>
+  )
+}
+
+export function Section({
+  title,
+  defaultOpen = true,
+  advanced,
+  off = false,
+  children,
+}: {
+  title: string
+  defaultOpen?: boolean
+  advanced?: ReactNode
+  /** The section does nothing in the current mode. */
+  off?: boolean
+  children: ReactNode
+}) {
   const [open, setOpen] = useState(defaultOpen)
   const id = useId()
   return (
@@ -33,8 +58,10 @@ export function Section({ title, defaultOpen = true, advanced, children }: { tit
       </h2>
       {open && (
         <div id={id} className="section-body">
-          {children}
-          {advanced && <Advanced>{advanced}</Advanced>}
+          <Off off={off}>
+            {children}
+            {advanced && <Advanced>{advanced}</Advanced>}
+          </Off>
         </div>
       )}
     </section>

@@ -2,7 +2,7 @@
 
 **Why:** people want the aurora by itself as a PNG with a transparent background, to place over their own designs.
 
-**Goal:** a "Background: Scene / Aurora only" switch in the Size & format section. In aurora-only mode the preview and the export draw only the aurora (with its glow) on a transparent background.
+**Goal:** a "Background: Scene / Aurora only" switch in its own Background section, right under Size. In aurora-only mode the preview and the export draw only the aurora (with its glow) on a transparent background.
 
 **Non-goals:** a separate "background colour" picker; transparency for JPG.
 
@@ -13,7 +13,9 @@
 **Decided with the user**
 - Removed: sky gradient, stars, moon, land, lake, grain, vignette.
 - Kept: aurora shape, colours, glow (bloom), camera, exposure, saturation.
-- PNG and WebP keep transparency. JPG is disabled while the mode is on, with a short note.
+- PNG and WebP keep transparency. JPG is disabled while the mode is on, with the reason on its row.
+- Placement (revised after trying it): the inspector holds what the preview shows (Size, Background, Aurora, ...); the export dialog holds what only affects the file (format with a one-line note each, quality for JPG/WebP) plus a small picture of what will be saved.
+- In Aurora only mode, Sky, Land, grain and vignette are dimmed and disabled with "Not used in Aurora only mode"; their values stay.
 
 **Builder's calls**
 - Alpha comes from brightness: `a = max(r, g, b)` of the finished colour, and the colour is divided by `a`. Over black the result matches the in-app look exactly.

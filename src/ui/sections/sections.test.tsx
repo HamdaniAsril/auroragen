@@ -4,7 +4,6 @@ import { defaultScene } from '../../scene/defaults'
 import { studio } from '../../state/store'
 import { Inspector } from '../Inspector'
 import { AuroraSection } from './AuroraSection'
-import { FrameSection } from './FrameSection'
 
 beforeEach(() => studio.setState({ scene: defaultScene(), activeLayer: 0, lang: 'id', history: { past: [], future: [] }, format: 'png' }))
 afterEach(() => vi.restoreAllMocks())
@@ -40,15 +39,27 @@ test('aurora seed and land seed are separate controls', () => {
   expect(studio.getState().scene.land.seed).toBe(5000)
 })
 
-test('aurora only is a background choice, and it turns JPG off', () => {
-  const { getByRole } = render(<FrameSection />)
-  fireEvent.click(getByRole('button', { name: 'JPG' }))
-  expect(studio.getState().format).toBe('jpg')
+test('size and background are separate sections, and format is not in the panel', () => {
+  const { getByRole, queryByRole } = render(<Inspector />)
+  expect(getByRole('button', { name: 'Ukuran' })).toBeTruthy()
+  expect(getByRole('button', { name: 'Latar' })).toBeTruthy()
+  expect(queryByRole('button', { name: 'PNG' })).toBeNull()
+})
+
+test('aurora only turns off the sky, land, grain and vignette controls, and keeps their values', () => {
+  const { getByRole, getAllByText } = render(<Inspector />)
+  const isOff = (name: string) => getByRole('slider', { name }).matches(':disabled')
+  expect(isOff('Jumlah bintang')).toBe(false)
   fireEvent.click(getByRole('button', { name: 'Aurora saja' }))
   expect(studio.getState().scene.frame.auroraOnly).toBe(true)
-  expect(studio.getState().format).toBe('png')
-  expect((getByRole('button', { name: 'JPG' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(isOff('Jumlah bintang')).toBe(true)
+  expect(isOff('Tinggi')).toBe(true)
+  expect(isOff('Grain')).toBe(true)
+  expect(isOff('Vignette')).toBe(true)
+  expect(isOff('Pendar')).toBe(false)
+  expect(isOff('Lensa')).toBe(false)
+  expect(getAllByText('Tidak dipakai dalam mode Aurora saja')).toHaveLength(3)
   fireEvent.click(getByRole('button', { name: 'Pemandangan' }))
-  expect(studio.getState().scene.frame.auroraOnly).toBe(false)
-  expect((getByRole('button', { name: 'JPG' }) as HTMLButtonElement).disabled).toBe(false)
+  expect(isOff('Jumlah bintang')).toBe(false)
+  expect(studio.getState().scene.sky.starDensity).toBe(defaultScene().sky.starDensity)
 })

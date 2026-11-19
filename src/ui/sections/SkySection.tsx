@@ -8,9 +8,10 @@ import { Toggle } from '../controls/Toggle'
 export function SkySection() {
   const t = useT()
   const sky = useStudio((s) => s.scene.sky)
+  const auroraOnly = useStudio((s) => s.scene.frame.auroraOnly)
   const update = studio.getState().update
   return (
-    <Section title={t('section.sky')}>
+    <Section title={t('section.sky')} off={auroraOnly}>
       <ColorRow label={t('field.zenith')} value={sky.zenith} onChange={(v) => update((s) => void (s.sky.zenith = v), 'sky.zenith')} />
       <ColorRow label={t('field.horizon')} value={sky.horizon} onChange={(v) => update((s) => void (s.sky.horizon = v), 'sky.horizon')} />
       <SliderRow label={t('field.starDensity')} path="sky.starDensity" value={sky.starDensity} onChange={(v, k) => update((s) => void (s.sky.starDensity = v), k)} />
