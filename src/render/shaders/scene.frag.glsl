@@ -205,15 +205,34 @@ vec3 aurora(vec3 rd, float jit) {
 }
 
 float stars(vec3 rd) {
-  vec2 sp = rd.xz / (1.0 + max(rd.y, 0.0)) * 240.0;
-  vec2 id = floor(sp), f = fract(sp);
-  float h = h21(id);
-  if (h < 1.0 - 0.08 * uStars.x) return 0.0;
-  vec2 pos = vec2(h21(id + 1.7), h21(id + 9.2)) * 0.6 + 0.2;
-  float d = length(f - pos);
-  float br = pow(h21(id + 4.4), 5.0) * 1.4 + 0.12;
-  float tw = 0.75 + 0.25 * sin(uTime * (1.0 + 3.0 * h21(id + 2.0)) + h * 40.0);
-  return br * tw * smoothstep(0.14, 0.0, d) * (uStars.y / 0.6);
+  float lift = 1.0 + max(rd.y, 0.0);
+  vec2 sp = rd.xz / lift * 240.0;
+  vec2 cell = floor(sp);
+  // Each star is a small blur widened to at least the pixel it lands in, with its light
+  // kept constant, so it holds its place and brightness at every render size.
+  float px = 2.0 * uCam.z / uFullRes.x * 240.0 / lift;
+  float s0 = 0.07;
+  float s2 = s0 * s0 + 0.16 * px * px;
+  float norm = s0 * s0 / s2;
+  float total = 0.0;
+  for (int j = -1; j <= 1; j++)
+    for (int i = -1; i <= 1; i++) {
+      vec2 id = cell + vec2(i, j);
+      float h = h21(id);
+      if (h < 1.0 - 0.08 * uStars.x) continue;
+      vec2 dv = sp - (id + vec2(h21(id + 1.7), h21(id + 9.2)) * 0.6 + 0.2);
+      float br = pow(h21(id + 4.4), 5.0) * 1.4 + 0.12;
+      // About a third of the stars twinkle, gently and unevenly; more so low in the sky.
+      float tw = 1.0;
+      float k = h21(id + 2.0);
+      if (k < 0.35) {
+        float f = 1.7 + 2.6 * h21(id + 6.1);
+        float wob = 0.6 * sin(uTime * f + h * 40.0) + 0.4 * sin(uTime * f * 1.73 + k * 90.0);
+        tw = 1.0 + wob * mix(0.22, 0.1, clamp(rd.y * 2.0, 0.0, 1.0));
+      }
+      total += br * tw * norm * exp(-0.5 * dot(dv, dv) / s2);
+    }
+  return total * (uStars.y / 0.6);
 }
 
 vec3 moonDir() {
